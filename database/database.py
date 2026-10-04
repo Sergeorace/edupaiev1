@@ -62,13 +62,14 @@ def get_transaction(conn: sqlite3.Connection):
         raise
 
 
-def init_database(db_path: Optional[Path] = None) -> None:
+def init_database(db_path: Optional[Path] = None, with_seed: bool = True) -> None:
     """
     Initialise la base de données avec le schéma et les données de test.
 
     Args:
         db_path: Chemin vers le fichier de base de données.
                  Si None, utilise le chemin par défaut.
+        with_seed: Si True, insère les données de test. Si False, seulement le schéma.
     """
     if db_path is None:
         db_path = get_db_path()
@@ -84,10 +85,11 @@ def init_database(db_path: Optional[Path] = None) -> None:
     conn.commit()
 
     # Insertion des données de test
-    with open(seed_path, "r", encoding="utf-8") as f:
-        seed_sql = f.read()
-        conn.executescript(seed_sql)
-    conn.commit()
+    if with_seed:
+        with open(seed_path, "r", encoding="utf-8") as f:
+            seed_sql = f.read()
+            conn.executescript(seed_sql)
+        conn.commit()
 
     conn.close()
 
