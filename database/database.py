@@ -6,7 +6,7 @@ Fournit la connexion, la création de la base et la gestion des transactions.
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Generator, Optional
 
 
 def get_db_path() -> Path:
@@ -38,7 +38,9 @@ def create_connection(
 
 
 @contextmanager
-def get_transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Cursor]:
+def get_transaction(
+    conn: sqlite3.Connection, immediate: bool = False
+) -> Generator[sqlite3.Cursor, None, None]:
     """
     Gestionnaire de contexte pour les transactions.
 
@@ -56,12 +58,26 @@ def get_transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Cursor]:
             cursor.execute("INSERT INTO ...")
             # Si aucune exception, commit automatique
     """
+    nested = conn.in_transaction
     cursor = conn.cursor()
+    if nested:
+        # Utilise un savepoint pour préserver une transaction englobante.
+        cursor.execute("SAVEPOINT gestion_scolarite_transaction")
+    else:
+        # Réserve l'écriture immédiatement si l'appelant demande un verrou exclusif.
+        cursor.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
     try:
         yield cursor
-        conn.commit()
+        if nested:
+            cursor.execute("RELEASE SAVEPOINT gestion_scolarite_transaction")
+        else:
+            conn.commit()
     except Exception:
-        conn.rollback()
+        if nested:
+            cursor.execute("ROLLBACK TO SAVEPOINT gestion_scolarite_transaction")
+            cursor.execute("RELEASE SAVEPOINT gestion_scolarite_transaction")
+        else:
+            conn.rollback()
         raise
 
 

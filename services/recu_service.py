@@ -7,7 +7,8 @@ from typing import Optional, List
 
 from models.recu import Recu
 from repositories.recu_repository import RecuRepository
-from utils.exceptions import EntiteIntrouvableError
+from utils.date_utils import extract_annee_from_recu_numero, get_annee_civile
+from utils.exceptions import RegleMetierError
 
 
 class RecuService:
@@ -71,17 +72,29 @@ class RecuService:
 
         Returns:
             Numéro de reçu au format REC-AAAA-NNNNN.
+
+        Note:
+            Cette méthode doit être appelée dans la transaction qui crée le
+            paiement et le reçu afin que deux enregistrements concurrents ne
+            reçoivent pas le même numéro.
         """
-        from utils.date_utils import get_annee_civile
-
-        last_numero = self.repository.get_last_numero(annee_id)
         annee_civile = get_annee_civile()
+        last_sequence = 0
+        for recu in self.repository.get_by_annee(annee_id):
+            try:
+                annee_recu = extract_annee_from_recu_numero(recu.numero)
+            except ValueError as error:
+                raise RegleMetierError(
+                    "Un numéro de reçu enregistré est invalide."
+                ) from error
+            if annee_recu == annee_civile:
+                last_sequence = max(
+                    last_sequence, int(recu.numero.split("-")[2])
+                )
 
-        if last_numero:
-            # Extraire le numéro séquentiel et l'incrémenter
-            last_seq = int(last_numero.split("-")[2])
-            new_seq = last_seq + 1
-        else:
-            new_seq = 1
+        if last_sequence >= 99999:
+            raise RegleMetierError(
+                "La séquence de numéros de reçu est épuisée pour cette année."
+            )
 
-        return f"REC-{annee_civile}-{new_seq:05d}"
+        return f"REC-{annee_civile}-{last_sequence + 1:05d}"

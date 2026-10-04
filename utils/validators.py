@@ -3,11 +3,12 @@ Fonctions de validation des données.
 """
 
 from datetime import date
-from typing import Optional
+from typing import Any
+
 from utils.exceptions import ValidationError
 
 
-def validate_required(value: any, field_name: str) -> None:
+def validate_required(value: Any, field_name: str) -> None:
     """
     Valide qu'un champ n'est pas vide.
 
@@ -32,7 +33,7 @@ def validate_montant(montant: int) -> None:
     Raises:
         ValidationError: Si le montant n'est pas valide.
     """
-    if not isinstance(montant, int):
+    if isinstance(montant, bool) or not isinstance(montant, int):
         raise ValidationError("Le montant doit être un entier.")
     if montant <= 0:
         raise ValidationError("Le montant doit être supérieur à 0.")
@@ -66,11 +67,11 @@ def validate_telephone(telephone: str) -> None:
     Raises:
         ValidationError: Si le numéro n'est pas valide.
     """
-    if not telephone or not isinstance(telephone, str):
+    if not isinstance(telephone, str) or not telephone.strip():
         raise ValidationError("Le numéro de téléphone est obligatoire.")
 
     # Vérifier que le téléphone contient uniquement des chiffres et espaces
-    cleaned = telephone.replace(" ", "")
+    cleaned = "".join(telephone.split())
     if not cleaned.isdigit() or len(cleaned) < 8:
         raise ValidationError(
             "Le numéro de téléphone doit contenir au moins 8 chiffres."
@@ -87,7 +88,7 @@ def validate_matricule(matricule: str) -> None:
     Raises:
         ValidationError: Si le matricule n'est pas valide.
     """
-    if not matricule or not isinstance(matricule, str):
+    if not isinstance(matricule, str) or not matricule.strip():
         raise ValidationError("Le matricule est obligatoire.")
 
     if len(matricule.strip()) < 3:

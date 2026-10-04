@@ -18,6 +18,9 @@ def parse_date(date_str: str) -> date:
     Raises:
         ValueError: Si le format n'est pas valide.
     """
+    if not isinstance(date_str, str):
+        raise ValueError("La date doit être une chaîne de caractères.")
+
     # Essayer le format JJ/MM/AAAA
     try:
         return datetime.strptime(date_str, "%d/%m/%Y").date()
@@ -59,10 +62,18 @@ def extract_annee_from_recu_numero(numero: str) -> int:
     Raises:
         ValueError: Si le format du numéro est invalide.
     """
-    try:
-        parts = numero.split("-")
-        if len(parts) != 3 or parts[0] != "REC":
-            raise ValueError("Format de numéro de reçu invalide")
-        return int(parts[1])
-    except (IndexError, ValueError) as e:
-        raise ValueError(f"Format de numéro de reçu invalide : {numero}") from e
+    if not isinstance(numero, str):
+        raise ValueError("Le numéro de reçu doit être une chaîne de caractères.")
+
+    parts = numero.split("-")
+    if (
+        len(parts) != 3
+        or parts[0] != "REC"
+        or len(parts[1]) != 4
+        or not parts[1].isdigit()
+        or len(parts[2]) != 5
+        or not parts[2].isdigit()
+    ):
+        raise ValueError(f"Format de numéro de reçu invalide : {numero}")
+
+    return int(parts[1])

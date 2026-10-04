@@ -6,17 +6,20 @@ import sqlite3
 from datetime import date
 from typing import List, Optional
 
+from database.database import get_transaction
 from models.eleve import Eleve
 from repositories.eleve_repository import EleveRepository
 from utils.validators import (
     validate_required,
-    validate_montant,
     validate_date,
     validate_telephone,
     validate_matricule,
     validate_sexe,
 )
-from utils.exceptions import ValidationError, RegleMetierError
+from utils.exceptions import (
+    EntiteIntrouvableError,
+    RegleMetierError,
+)
 
 
 class EleveService:
@@ -70,9 +73,10 @@ class EleveService:
         validate_required(tuteur, "tuteur")
         validate_required(telephone, "téléphone")
 
+        matricule = matricule.strip().upper()
         validate_matricule(matricule)
         validate_sexe(sexe)
-        validate_date(date_naissance, allow_future=True)  # Naissance peut être dans le futur pour tests
+        validate_date(date_naissance)
         validate_telephone(telephone)
 
         # Vérifier l'unicité du matricule
@@ -96,7 +100,13 @@ class EleveService:
             actif=True,
         )
 
-        return self.repository.create(eleve)
+        try:
+            with get_transaction(self.conn, immediate=True):
+                return self.repository.create(eleve)
+        except sqlite3.IntegrityError as error:
+            raise RegleMetierError(
+                "Impossible de créer l'élève : vérifiez le matricule et la classe."
+            ) from error
 
     def update_eleve(
         self,
@@ -134,7 +144,7 @@ class EleveService:
         # Vérifier que l'élève existe
         eleve = self.repository.get_by_id(eleve_id)
         if not eleve:
-            raise RegleMetierError(f"Élève avec ID {eleve_id} introuvable.")
+            raise EntiteIntrouvableError(f"Élève avec ID {eleve_id} introuvable.")
 
         # Validation des champs
         validate_required(matricule, "matricule")
@@ -143,13 +153,14 @@ class EleveService:
         validate_required(tuteur, "tuteur")
         validate_required(telephone, "téléphone")
 
+        matricule = matricule.strip().upper()
         validate_matricule(matricule)
         validate_sexe(sexe)
-        validate_date(date_naissance, allow_future=True)
+        validate_date(date_naissance)
         validate_telephone(telephone)
 
         # Vérifier l'unicité du matricule (si différent de l'actuel)
-        if matricule.upper() != eleve.matricule:
+        if matricule != eleve.matricule:
             existing = self.repository.get_by_matricule(matricule)
             if existing:
                 raise RegleMetierError(
@@ -157,7 +168,7 @@ class EleveService:
                 )
 
         # Mettre à jour l'élève
-        eleve.matricule = matricule.upper()
+        eleve.matricule = matricule
         eleve.nom = nom.upper()
         eleve.prenom = prenom.capitalize()
         eleve.date_naissance = date_naissance
@@ -166,7 +177,13 @@ class EleveService:
         eleve.tuteur = tuteur.capitalize()
         eleve.telephone = telephone
 
-        self.repository.update(eleve)
+        try:
+            with get_transaction(self.conn, immediate=True):
+                self.repository.update(eleve)
+        except sqlite3.IntegrityError as error:
+            raise RegleMetierError(
+                "Impossible de modifier l'élève : vérifiez le matricule et la classe."
+            ) from error
         return eleve
 
     def archive_eleve(self, eleve_id: int) -> None:
@@ -181,9 +198,10 @@ class EleveService:
         """
         eleve = self.repository.get_by_id(eleve_id)
         if not eleve:
-            raise RegleMetierError(f"Élève avec ID {eleve_id} introuvable.")
+            raise EntiteIntrouvableError(f"Élève avec ID {eleve_id} introuvable.")
 
-        self.repository.archive(eleve_id)
+        with get_transaction(self.conn, immediate=True):
+            self.repository.archive(eleve_id)
 
     def get_eleve_by_id(self, eleve_id: int) -> Optional[Eleve]:
         """
@@ -243,5 +261,9 @@ class EleveService:
             Liste des élèves correspondant aux critères.
         """
         return self.repository.search(
-            nom=nom, prenom=prenom, matricule=matricule, classe_id=classe_id, actif_only=actif_only
+            nom=nom,
+            prenom=prenom,
+            matricule=matricule,
+            classe_id=classe_id,
+            actif_only=actif_only,
         )

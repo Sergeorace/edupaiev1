@@ -4,14 +4,19 @@ Utilise une base de données SQLite en mémoire.
 """
 
 from datetime import date, timedelta
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import sqlite3
+from threading import Barrier
+
 import pytest
 
-from database.database import create_connection
+from database.database import create_connection, init_database
 from repositories.eleve_repository import EleveRepository
 from repositories.paiement_repository import PaiementRepository
 from repositories.frais_classe_repository import FraisClasseRepository
 from repositories.dashboard_repository import DashboardRepository
+from repositories.recu_repository import RecuRepository
 from models.eleve import Eleve
 from models.paiement import Paiement
 
@@ -113,6 +118,24 @@ class TestValidators:
         with pytest.raises(ValidationError):
             validate_telephone("abc12345")
 
+    def test_validate_matricule(self):
+        """Accepte les matricules alphanumériques et refuse les autres formats."""
+        from utils.validators import validate_matricule
+
+        validate_matricule("MAT001")
+
+        with pytest.raises(ValidationError, match="matricule"):
+            validate_matricule("")
+        with pytest.raises(ValidationError, match="lettres et des chiffres"):
+            validate_matricule("MAT-001")
+
+    def test_validate_montant_refuse_booleen(self):
+        """Un booléen ne constitue pas un montant entier valide."""
+        from utils.validators import validate_montant
+
+        with pytest.raises(ValidationError, match="entier"):
+            validate_montant(True)
+
 
 class TestFormatters:
     """Tests pour les formatters."""
@@ -131,6 +154,32 @@ class TestFormatters:
 
         assert format_date(date(2025, 9, 15)) == "15/09/2025"
         assert format_date(date(2026, 1, 1)) == "01/01/2026"
+
+
+class TestDateUtils:
+    """Tests des utilitaires de date et de numérotation."""
+
+    def test_parse_date_formats_acceptes(self):
+        """Accepte les deux formats de date documentés."""
+        from utils.date_utils import parse_date
+
+        assert parse_date("15/09/2025") == date(2025, 9, 15)
+        assert parse_date("2025-09-15") == date(2025, 9, 15)
+
+    def test_parse_date_refuse_une_valeur_non_textuelle(self):
+        """Retourne une erreur claire pour une valeur qui n'est pas du texte."""
+        from utils.date_utils import parse_date
+
+        with pytest.raises(ValueError, match="chaîne de caractères"):
+            parse_date(None)
+
+    def test_extract_annee_from_recu_numero_valide_le_format(self):
+        """Extrait l'année seulement pour un numéro de reçu conforme."""
+        from utils.date_utils import extract_annee_from_recu_numero
+
+        assert extract_annee_from_recu_numero("REC-2026-00001") == 2026
+        with pytest.raises(ValueError, match="Format de numéro"):
+            extract_annee_from_recu_numero("REC-2026-1")
 
 
 class TestEleveService:
@@ -174,6 +223,32 @@ class TestEleveService:
         with pytest.raises(RegleMetierError, match="déjà utilisé"):
             service.create_eleve(
                 matricule="MAT998",
+                nom="DIALLO",
+                prenom="Aminata",
+                date_naissance=date(2012, 8, 22),
+                sexe="F",
+                classe_id=1,
+                tuteur="DIALLO Ibrahim",
+                telephone="0707010102",
+            )
+
+    def test_create_eleve_duplicate_matricule_case_insensitive(self, in_memory_db):
+        """Le matricule reste unique même si sa casse est différente."""
+        service = EleveService(in_memory_db)
+        service.create_eleve(
+            "MATUNIQUE",
+            "KOUASSI",
+            "Jean",
+            date(2012, 5, 15),
+            "M",
+            1,
+            "KOUASSI Paul",
+            "0707010101",
+        )
+
+        with pytest.raises(RegleMetierError, match="déjà utilisé"):
+            service.create_eleve(
+                matricule="matunique",
                 nom="DIALLO",
                 prenom="Aminata",
                 date_naissance=date(2012, 8, 22),
@@ -307,6 +382,7 @@ class TestPaiementService:
         # MAT005 : Payé (solde = 0)
         statut = service.calculer_statut(5, 1)
         assert statut == "Payé"
+        assert service.calculer_statut(11, 1) == "Impayé"
 
     def test_enregistrer_paiement_success(self, in_memory_db):
         """Test l'enregistrement réussi d'un paiement."""
@@ -362,6 +438,19 @@ class TestPaiementService:
                 eleve_id=1,
                 annee_id=1,
                 montant=-1000,
+                date_paiement=date.today(),
+                mode_paiement="Espèces",
+            )
+
+    def test_enregistrer_paiement_montant_texte(self, in_memory_db):
+        """Refuse un montant fourni sous forme de texte."""
+        service = PaiementService(in_memory_db)
+
+        with pytest.raises(ValidationError, match="entier"):
+            service.enregistrer_paiement(
+                eleve_id=1,
+                annee_id=1,
+                montant="1000",
                 date_paiement=date.today(),
                 mode_paiement="Espèces",
             )
@@ -430,6 +519,112 @@ class TestPaiementService:
         with pytest.raises(RegleMetierError, match="déjà annulé"):
             service.annuler_paiement(paiement.id, "Seconde annulation")
 
+    def test_annuler_puis_enregistrer_un_nouveau_paiement(self, in_memory_db):
+        """L'annulation libère le solde pour un paiement ultérieur."""
+        service = PaiementService(in_memory_db)
+        paiement = service.enregistrer_paiement(
+            eleve_id=3,
+            annee_id=1,
+            montant=10000,
+            date_paiement=date.today(),
+            mode_paiement="Espèces",
+        )
+        service.annuler_paiement(paiement.id, "Erreur de saisie")
+
+        nouveau_paiement = service.enregistrer_paiement(
+            eleve_id=3,
+            annee_id=1,
+            montant=10000,
+            date_paiement=date.today(),
+            mode_paiement="Mobile",
+        )
+
+        assert nouveau_paiement.id != paiement.id
+        assert service.calculer_total_paye(3, 1) == 160000
+        assert service.get_paiement_by_id(paiement.id).statut == "annule"
+
+    def test_echec_creation_recu_annule_paiement_et_recu(
+        self, in_memory_db, monkeypatch
+    ):
+        """Une erreur pendant l'insertion du reçu annule toute la transaction."""
+        service = PaiementService(in_memory_db)
+        nombre_paiements = in_memory_db.execute(
+            "SELECT COUNT(*) FROM paiements"
+        ).fetchone()[0]
+        nombre_recus = in_memory_db.execute(
+            "SELECT COUNT(*) FROM recus"
+        ).fetchone()[0]
+
+        def echec_creation_recu(self, recu):
+            raise sqlite3.IntegrityError("échec simulé")
+
+        monkeypatch.setattr(RecuRepository, "create", echec_creation_recu)
+        with pytest.raises(RegleMetierError, match="n'a pas pu être enregistré"):
+            service.enregistrer_paiement(
+                eleve_id=3,
+                annee_id=1,
+                montant=10000,
+                date_paiement=date.today(),
+                mode_paiement="Espèces",
+            )
+
+        assert in_memory_db.execute(
+            "SELECT COUNT(*) FROM paiements"
+        ).fetchone()[0] == nombre_paiements
+        assert in_memory_db.execute(
+            "SELECT COUNT(*) FROM recus"
+        ).fetchone()[0] == nombre_recus
+        assert service.calculer_total_paye(3, 1) == 150000
+        monkeypatch.undo()
+
+        paiement = service.enregistrer_paiement(
+            eleve_id=3,
+            annee_id=1,
+            montant=10000,
+            date_paiement=date.today(),
+            mode_paiement="Espèces",
+        )
+        recu = RecuRepository(in_memory_db).get_by_paiement(paiement.id)
+        assert recu.numero == f"REC-{date.today().year}-00038"
+
+    def test_enregistrements_concurrents_ne_depassent_pas_le_solde(self, tmp_path):
+        """Deux paiements simultanés sont sérialisés avant contrôle du solde."""
+        database_path = tmp_path / "paiements_concurrents.db"
+        init_database(database_path)
+        barrier = Barrier(2)
+
+        def tenter_paiement():
+            conn = create_connection(database_path)
+            try:
+                service = PaiementService(conn)
+                barrier.wait()
+                try:
+                    service.enregistrer_paiement(
+                        eleve_id=3,
+                        annee_id=1,
+                        montant=20000,
+                        date_paiement=date.today(),
+                        mode_paiement="Espèces",
+                    )
+                    return "enregistré"
+                except PaiementSuperieurAuSoldeError:
+                    return "refusé"
+            finally:
+                conn.close()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            resultats = list(executor.map(lambda _: tenter_paiement(), range(2)))
+
+        assert sorted(resultats) == ["enregistré", "refusé"]
+
+        conn = create_connection(database_path)
+        try:
+            service = PaiementService(conn)
+            assert service.calculer_total_paye(3, 1) == 170000
+            assert service.calculer_solde(3, 1) == 15000
+        finally:
+            conn.close()
+
 
 class TestRecuService:
     """Tests pour RecuService."""
@@ -461,6 +656,18 @@ class TestRecuService:
 
         assert numero.startswith("REC-")
         assert len(numero.split("-")) == 3
+
+    def test_generer_numero_recu_repart_a_un_nouvel_annee_civile(
+        self, in_memory_db, monkeypatch
+    ):
+        """La séquence recommence à un pour la nouvelle année civile."""
+        service = RecuService(in_memory_db)
+
+        monkeypatch.setattr("services.recu_service.get_annee_civile", lambda: 2026)
+        assert service.generer_numero_recu(1) == "REC-2026-00038"
+
+        monkeypatch.setattr("services.recu_service.get_annee_civile", lambda: 2027)
+        assert service.generer_numero_recu(1) == "REC-2027-00001"
 
 
 class TestDashboardService:

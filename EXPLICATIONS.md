@@ -171,10 +171,11 @@ Cette étape a permis de mettre en place toute la logique métier de l'applicati
 - Tests pour les formatters (montants, dates)
 - Tests pour EleveService (création, mise à jour, archivage, validation, unicité du matricule)
 - Tests pour PaiementService (calculs, enregistrement, contrôle du solde, annulation)
-- Tests pour RecuService (récupération, génération de numéro)
+- Tests pour RecuService (récupération, génération de numéro et nouvelle année civile)
 - Tests pour DashboardService (statistiques, agrégations)
-- Tests des cas limites : montant 0, négatif, date future, dépassement du solde, annulation sans motif
-- ✅ Tous les tests passent (46/46)
+- Tests des cas limites : montant 0, négatif ou texte, date future, dépassement du solde, doublon de matricule et annulation sans motif
+- Tests du rollback en cas d'échec lors de la création du reçu, de la reprise du paiement après annulation et de deux paiements concurrents
+- Les tests de la couche métier passent (41 tests). La suite complète reste bloquée avant la collecte des tests UI par un nom `sqlite3` non défini dans l'annotation de `ui/eleves/eleve_form.py`, qui est hors du périmètre de cette étape.
 
 ### Points clés pour la défense orale
 
@@ -191,6 +192,19 @@ Cette étape a permis de mettre en place toute la logique métier de l'applicati
 6. **Numérotation séquentielle des reçus** : Le numéro de reçu est généré automatiquement avec le format REC-AAAA-NNNNN. La transaction garantit qu'il n'y a ni doublon ni trou en cas d'échec.
 
 7. **Tests complets** : Les tests couvrent les cas nominaux et les cas limites (montants invalides, dates futures, dépassement de solde, annulation sans motif). L'utilisation d'une base en mémoire garantit l'isolation des tests.
+
+8. **Paiements concurrents** : Le service demande à SQLite de réserver l'écriture avant de vérifier le solde. Ainsi, deux paiements simultanés ne peuvent pas utiliser le même solde restant.
+
+9. **Absence de trou dans les reçus** : Le numéro est calculé et le reçu est inséré dans la même transaction que le paiement. Si une étape échoue, le paiement et le reçu sont annulés ensemble, et le prochain paiement peut reprendre le numéro sans en sauter.
+
+10. **Erreurs compréhensibles** : Les entrées invalides, les soldes insuffisants et les entités absentes déclenchent des exceptions métier avec un message explicite, au lieu de faire apparaître une erreur SQLite brute.
+
+### Hypothèses supplémentaires pour cette étape
+
+- Les matricules sont normalisés en majuscules et comparés sans distinction de casse.
+- Une date de naissance ne peut pas être dans le futur ; une date de paiement non plus.
+- L'année du reçu est l'année civile au moment de l'émission ; la séquence recommence à `00001` au changement d'année civile.
+- La méthode qui calcule le prochain numéro de reçu est appelée à l'intérieur de la transaction qui enregistre le paiement et le reçu.
 
 ---
 
