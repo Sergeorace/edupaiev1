@@ -2,15 +2,19 @@
 Modèle de table pour les élèves.
 """
 
-from PySide6.QtCore import QAbstractTableModel, Qt
-from typing import List, Optional
+from typing import Any, List, Optional
+
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide6.QtGui import QColor
+
 from models.eleve import Eleve
+from utils.formatters import format_montant
 
 
 class EleveTableModel(QAbstractTableModel):
     """Modèle de table pour afficher les élèves."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[Any] = None) -> None:
         """
         Initialise le modèle.
 
@@ -19,8 +23,8 @@ class EleveTableModel(QAbstractTableModel):
         """
         super().__init__(parent)
         self._eleves: List[Eleve] = []
-        self._soldes: dict = {}  # eleve_id -> solde
-        self._statuts: dict = {}  # eleve_id -> statut
+        self._soldes: dict[int, int] = {}
+        self._statuts: dict[int, str] = {}
 
         self._headers = [
             "Matricule",
@@ -33,21 +37,27 @@ class EleveTableModel(QAbstractTableModel):
             "Statut",
         ]
 
-    def rowCount(self, parent=None) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Retourne le nombre de lignes."""
         return len(self._eleves)
 
-    def columnCount(self, parent=None) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Retourne le nombre de colonnes."""
         return len(self._headers)
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int):
+    def headerData(
+        self, section: int, orientation: Qt.Orientation, role: int = ...
+    ) -> Any:
         """Retourne les données d'en-tête."""
-        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
+        if (
+            role == Qt.ItemDataRole.DisplayRole
+            and orientation == Qt.Orientation.Horizontal
+            and 0 <= section < len(self._headers)
+        ):
             return self._headers[section]
         return None
 
-    def data(self, index, role: int):
+    def data(self, index: QModelIndex, role: int = ...) -> Any:
         """Retourne les données pour une cellule."""
         if not index.isValid():
             return None
@@ -56,45 +66,46 @@ class EleveTableModel(QAbstractTableModel):
         column = index.column()
 
         if role == Qt.ItemDataRole.DisplayRole:
-            if column == 0:  # Matricule
+            if column == 0:
                 return eleve.matricule
-            elif column == 1:  # Nom
+            if column == 1:
                 return eleve.nom
-            elif column == 2:  # Prénom
+            if column == 2:
                 return eleve.prenom
-            elif column == 3:  # Classe
+            if column == 3:
                 return eleve.classe_nom or f"Classe {eleve.classe_id}"
-            elif column == 4:  # Tuteur
+            if column == 4:
                 return eleve.tuteur
-            elif column == 5:  # Téléphone
+            if column == 5:
                 return eleve.telephone
-            elif column == 6:  # Solde
-                from utils.formatters import format_montant
+            if column == 6:
                 solde = self._soldes.get(eleve.id, 0)
                 return format_montant(solde)
-            elif column == 7:  # Statut
+            if column == 7:
                 return self._statuts.get(eleve.id, "Inconnu")
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            if column in [6]:  # Solde aligné à droite
-                return Qt.AlignmentFlag.AlignRight
+            if column == 6:
+                return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         elif role == Qt.ItemDataRole.ForegroundRole:
-            if column == 7:  # Couleur du statut
+            if column in (6, 7):
                 statut = self._statuts.get(eleve.id, "")
                 if statut == "Impayé":
-                    from PySide6.QtGui import QColor
                     return QColor("#e74c3c")
-                elif statut == "Partiel":
-                    from PySide6.QtGui import QColor
+                if statut == "Partiel":
                     return QColor("#f39c12")
-                elif statut == "Payé":
-                    from PySide6.QtGui import QColor
+                if statut == "Payé":
                     return QColor("#27ae60")
 
         return None
 
-    def set_eleves(self, eleves: List[Eleve]) -> None:
+    def set_eleves(
+        self,
+        eleves: List[Eleve],
+        soldes: Optional[dict[int, int]] = None,
+        statuts: Optional[dict[int, str]] = None,
+    ) -> None:
         """
         Définit la liste des élèves.
 
@@ -102,7 +113,11 @@ class EleveTableModel(QAbstractTableModel):
             eleves: Liste des élèves.
         """
         self.beginResetModel()
-        self._eleves = eleves
+        self._eleves = list(eleves)
+        if soldes is not None:
+            self._soldes = dict(soldes)
+        if statuts is not None:
+            self._statuts = dict(statuts)
         self.endResetModel()
 
     def set_solde(self, eleve_id: int, solde: int) -> None:
@@ -114,6 +129,7 @@ class EleveTableModel(QAbstractTableModel):
             solde: Solde restant.
         """
         self._soldes[eleve_id] = solde
+        self._emit_row_changed(eleve_id)
 
     def set_statut(self, eleve_id: int, statut: str) -> None:
         """
@@ -124,6 +140,20 @@ class EleveTableModel(QAbstractTableModel):
             statut: Statut (Impayé, Partiel, Payé).
         """
         self._statuts[eleve_id] = statut
+        self._emit_row_changed(eleve_id)
+
+    def _emit_row_changed(self, eleve_id: int) -> None:
+        """Notifie la vue quand une donnée financière d'un élève change."""
+        row = next(
+            (index for index, eleve in enumerate(self._eleves) if eleve.id == eleve_id),
+            None,
+        )
+        if row is not None:
+            self.dataChanged.emit(
+                self.index(row, 6),
+                self.index(row, 7),
+                [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole],
+            )
 
     def get_eleve_at(self, row: int) -> Optional[Eleve]:
         """

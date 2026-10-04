@@ -68,11 +68,28 @@ QTableView {
     gridline-color: #ecf0f1;
 }
 
+QTableWidget {
+    background-color: white;
+    alternate-background-color: #f8fafc;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    gridline-color: #ecf0f1;
+}
+
 QTableView::item {
     padding: 8px;
 }
 
+QTableWidget::item {
+    padding: 6px;
+}
+
 QTableView::item:selected {
+    background-color: #3498db;
+    color: white;
+}
+
+QTableWidget::item:selected {
     background-color: #3498db;
     color: white;
 }
@@ -144,6 +161,19 @@ QLabel {
 
 QLabel#required {
     color: #e74c3c;
+}
+
+QLabel#validationMessage {
+    color: #c0392b;
+    font-weight: bold;
+}
+
+QLabel#balanceBefore, QLabel#balanceAfter {
+    padding: 10px;
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-weight: bold;
 }
 
 /* Dialog */

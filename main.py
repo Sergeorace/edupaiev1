@@ -6,6 +6,8 @@ import sys
 import logging
 from pathlib import Path
 from datetime import datetime
+from types import TracebackType
+from typing import Optional
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import QFile, QTextStream
@@ -15,7 +17,7 @@ from ui.main_window import MainWindow
 from utils.paths import get_user_db_path, copy_db_if_needed
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Configure le logging vers un fichier."""
     log_dir = Path(__file__).parent / "logs"
     log_dir.mkdir(exist_ok=True)
@@ -31,7 +33,11 @@ def setup_logging():
     )
 
 
-def handle_exception(exc_type, exc_value, exc_traceback):
+def handle_exception(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_traceback: Optional[TracebackType],
+) -> None:
     """
     Gestionnaire global d'exceptions.
 
@@ -42,17 +48,18 @@ def handle_exception(exc_type, exc_value, exc_traceback):
         exc_info=(exc_type, exc_value, exc_traceback),
     )
 
-    # Afficher un message d'erreur à l'utilisateur
-    msg = QMessageBox()
-    msg.setIcon(QMessageBox.Icon.Critical)
-    msg.setWindowTitle("Erreur")
-    msg.setText("Une erreur inattendue s'est produite.")
-    msg.setInformativeText(
-        "L'application va continuer de fonctionner. "
-        "Si le problème persiste, veuillez contacter le support technique."
-    )
-    msg.setDetailedText(f"{exc_type.__name__}: {str(exc_value)}")
-    msg.exec()
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    app = QApplication.instance()
+    if app is not None:
+        QMessageBox.critical(
+            None,
+            "Erreur",
+            "Une erreur inattendue s'est produite. "
+            "Les détails ont été enregistrés dans le journal.",
+        )
 
 
 def load_stylesheet(app: QApplication) -> None:
@@ -71,7 +78,7 @@ def load_stylesheet(app: QApplication) -> None:
             file.close()
 
 
-def main():
+def main() -> int:
     """Point d'entrée principal."""
     # Configurer le logging
     setup_logging()
@@ -94,14 +101,23 @@ def main():
 
     # Créer la connexion à la base de données
     conn = create_connection(user_db_path)
+    app.aboutToQuit.connect(conn.close)
 
-    # Créer et afficher la fenêtre principale
-    window = MainWindow(conn)
-    window.show()
-
-    # Exécuter l'application
-    sys.exit(app.exec())
+    try:
+        window = MainWindow(conn)
+        window.show()
+        return app.exec()
+    except Exception:
+        logging.exception("Impossible de démarrer l'application")
+        QMessageBox.critical(
+            None,
+            "Erreur de démarrage",
+            "L'application n'a pas pu démarrer. Consultez le journal pour plus "
+            "d'informations.",
+        )
+        conn.close()
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
