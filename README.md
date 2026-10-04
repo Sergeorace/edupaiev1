@@ -46,8 +46,9 @@ Cela crée le fichier `school.db` à la racine du projet avec :
 - 1 année scolaire (2025-2026)
 - 4 classes (6ème A, 6ème B, 5ème A, 4ème A)
 - 20 élèves
-- 40 paiements (couvrant les statuts : impayé, partiel, payé)
+- 37 paiements (environ 40, couvrant les statuts : impayé, partiel, payé)
 - 2 paiements annulés
+- Un reçu figé pour chaque paiement, y compris les paiements annulés
 
 ### Avec l'exécutable
 
@@ -187,7 +188,7 @@ Pour déclencher manuellement :
 - [ ] **Vérification de la base de données**
   - [ ] Ouvrir `%APPDATA%\GestionScolarite\`
   - [ ] Vérifier que le fichier `school.db` a été créé
-  - [ ] Vérifier que les données de test sont présentes (20 élèves, 40 paiements)
+  - [ ] Vérifier que les données de test sont présentes (20 élèves, 37 paiements)
 
 - [ ] **Test du tableau de bord**
   - [ ] Vérifier que les cartes de statistiques affichent des valeurs
@@ -254,4 +255,4 @@ Pour déclencher manuellement :
 - Version reportlab : 4.2.0
 - Nom de l'établissement : "ÉCOLE EXEMPLE" (configurable dans `reports/recu_generator.py`)
 - L'exécutable Windows ne peut pas être testé depuis Linux (limitation de l'environnement)
-
+- Le jeu de données d'exemple conserve aussi les reçus des paiements annulés, conformément à la règle métier.

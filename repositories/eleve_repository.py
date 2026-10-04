@@ -29,8 +29,8 @@ class EleveRepository:
         Returns:
             L'élève créé avec son ID généré.
         """
-        # Insertion de l'élève
         cursor = self.conn.cursor()
+        # Insère un élève et laisse SQLite attribuer son identifiant.
         cursor.execute(
             """
             INSERT INTO eleves (matricule, nom, prenom, date_naissance, sexe,
@@ -63,6 +63,7 @@ class EleveRepository:
             L'élève trouvé ou None.
         """
         cursor = self.conn.cursor()
+        # Recherche un élève par son identifiant avec le nom de sa classe.
         cursor.execute(
             """
             SELECT e.id, e.matricule, e.nom, e.prenom, e.date_naissance, e.sexe,
@@ -90,6 +91,7 @@ class EleveRepository:
             L'élève trouvé ou None.
         """
         cursor = self.conn.cursor()
+        # Recherche un élève par son matricule unique.
         cursor.execute(
             """
             SELECT e.id, e.matricule, e.nom, e.prenom, e.date_naissance, e.sexe,
@@ -117,7 +119,9 @@ class EleveRepository:
             Liste des élèves.
         """
         cursor = self.conn.cursor()
+        # Liste les élèves actifs ou tous les élèves selon le filtre demandé.
         if actif_only:
+            # La liste des élèves actifs est triée par nom puis prénom.
             cursor.execute(
                 """
                 SELECT e.id, e.matricule, e.nom, e.prenom, e.date_naissance, e.sexe,
@@ -130,6 +134,7 @@ class EleveRepository:
                 """
             )
         else:
+            # La liste complète inclut aussi les élèves archivés.
             cursor.execute(
                 """
                 SELECT e.id, e.matricule, e.nom, e.prenom, e.date_naissance, e.sexe,
@@ -163,36 +168,31 @@ class EleveRepository:
         Returns:
             Liste des élèves correspondant aux critères.
         """
+        # Recherche les élèves par critères optionnels sans construire le SQL.
         query = """
             SELECT e.id, e.matricule, e.nom, e.prenom, e.date_naissance, e.sexe,
                    e.classe_id, c.nom as classe_nom, e.tuteur, e.telephone,
                    e.actif, e.date_creation
             FROM eleves e
             LEFT JOIN classes c ON e.classe_id = c.id
-            WHERE 1=1
+            WHERE (? = 0 OR e.actif = 1)
+              AND (? IS NULL OR e.nom LIKE ?)
+              AND (? IS NULL OR e.prenom LIKE ?)
+              AND (? IS NULL OR e.matricule LIKE ?)
+              AND (? IS NULL OR e.classe_id = ?)
+            ORDER BY e.nom, e.prenom
         """
-        params = []
-
-        if actif_only:
-            query += " AND e.actif = 1"
-
-        if nom:
-            query += " AND e.nom LIKE ?"
-            params.append(f"%{nom}%")
-
-        if prenom:
-            query += " AND e.prenom LIKE ?"
-            params.append(f"%{prenom}%")
-
-        if matricule:
-            query += " AND e.matricule LIKE ?"
-            params.append(f"%{matricule}%")
-
-        if classe_id:
-            query += " AND e.classe_id = ?"
-            params.append(classe_id)
-
-        query += " ORDER BY e.nom, e.prenom"
+        params = (
+            int(actif_only),
+            nom,
+            f"%{nom}%" if nom is not None else None,
+            prenom,
+            f"%{prenom}%" if prenom is not None else None,
+            matricule,
+            f"%{matricule}%" if matricule is not None else None,
+            classe_id,
+            classe_id,
+        )
 
         cursor = self.conn.cursor()
         cursor.execute(query, params)
@@ -206,6 +206,7 @@ class EleveRepository:
             eleve: L'élève à mettre à jour (avec l'ID).
         """
         cursor = self.conn.cursor()
+        # Met à jour les informations d'un élève sans changer son historique.
         cursor.execute(
             """
             UPDATE eleves
@@ -235,19 +236,8 @@ class EleveRepository:
             eleve_id: ID de l'élève à archiver.
         """
         cursor = self.conn.cursor()
+        # Archive l'élève au lieu de le supprimer.
         cursor.execute("UPDATE eleves SET actif = 0 WHERE id = ?", (eleve_id,))
-
-    def delete(self, eleve_id: int) -> None:
-        """
-        Supprime un élève de la base de données.
-        Note: Cette méthode ne devrait pas être utilisée selon les règles métier.
-        Préférer archive().
-
-        Args:
-            eleve_id: ID de l'élève à supprimer.
-        """
-        cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM eleves WHERE id = ?", (eleve_id,))
 
     def _row_to_eleve(self, row: sqlite3.Row) -> Eleve:
         """

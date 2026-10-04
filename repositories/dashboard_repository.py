@@ -29,6 +29,7 @@ class DashboardRepository:
             Somme des paiements valides.
         """
         cursor = self.conn.cursor()
+        # Calcule le total des paiements valides pour l'année demandée.
         cursor.execute(
             """
             SELECT COALESCE(SUM(montant), 0)
@@ -50,6 +51,7 @@ class DashboardRepository:
             Somme des soldes restants de tous les élèves.
         """
         cursor = self.conn.cursor()
+        # Calcule les soldes des élèves actifs puis les additionne.
         cursor.execute(
             """
             SELECT COALESCE(SUM(frais_dus - total_paye), 0)
@@ -81,6 +83,7 @@ class DashboardRepository:
             Dictionnaire avec les compteurs : {"Impayé": X, "Partiel": Y, "Payé": Z}.
         """
         cursor = self.conn.cursor()
+        # Classe chaque élève actif selon ses paiements valides de l'année.
         cursor.execute(
             """
             SELECT
@@ -128,6 +131,7 @@ class DashboardRepository:
             Liste des paiements avec détails.
         """
         cursor = self.conn.cursor()
+        # Récupère les paiements les plus récents avec l'identité de l'élève.
         cursor.execute(
             """
             SELECT

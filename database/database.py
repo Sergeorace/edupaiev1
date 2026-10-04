@@ -6,7 +6,7 @@ Fournit la connexion, la création de la base et la gestion des transactions.
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
 
 def get_db_path() -> Path:
@@ -14,7 +14,9 @@ def get_db_path() -> Path:
     return Path(__file__).parent.parent / "school.db"
 
 
-def create_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
+def create_connection(
+    db_path: Optional[Path | str] = None,
+) -> sqlite3.Connection:
     """
     Crée et retourne une connexion à la base de données.
 
@@ -28,14 +30,15 @@ def create_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     if db_path is None:
         db_path = get_db_path()
 
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row  # Permet d'accéder aux colonnes par nom
-    conn.execute("PRAGMA foreign_keys = ON")  # Active les clés étrangères
+    # Active la vérification des clés étrangères sur cette connexion.
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
 @contextmanager
-def get_transaction(conn: sqlite3.Connection):
+def get_transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Cursor]:
     """
     Gestionnaire de contexte pour les transactions.
 
@@ -62,7 +65,9 @@ def get_transaction(conn: sqlite3.Connection):
         raise
 
 
-def init_database(db_path: Optional[Path] = None, with_seed: bool = True) -> None:
+def init_database(
+    db_path: Optional[Path | str] = None, with_seed: bool = True
+) -> None:
     """
     Initialise la base de données avec le schéma et les données de test.
 
@@ -77,21 +82,43 @@ def init_database(db_path: Optional[Path] = None, with_seed: bool = True) -> Non
     schema_path = Path(__file__).parent / "schema.sql"
     seed_path = Path(__file__).parent / "seed.sql"
 
-    # Création de la base avec le schéma
     conn = create_connection(db_path)
-    with open(schema_path, "r", encoding="utf-8") as f:
-        schema_sql = f.read()
-        conn.executescript(schema_sql)
-    conn.commit()
+    try:
+        with open(schema_path, "r", encoding="utf-8") as f:
+            schema_sql = f.read()
+        try:
+            # Crée les tables et index en une seule transaction.
+            conn.executescript(f"BEGIN;\n{schema_sql}\nCOMMIT;")
+        except sqlite3.Error:
+            if conn.in_transaction:
+                conn.rollback()
+            raise
 
-    # Insertion des données de test
-    if with_seed:
-        with open(seed_path, "r", encoding="utf-8") as f:
-            seed_sql = f.read()
-            conn.executescript(seed_sql)
-        conn.commit()
-
-    conn.close()
+        if with_seed:
+            # Vérifie si la base contient déjà des données avant d'insérer le jeu de test.
+            cursor = conn.execute(
+                """
+                SELECT EXISTS (SELECT 1 FROM annees_scolaires)
+                    OR EXISTS (SELECT 1 FROM classes)
+                    OR EXISTS (SELECT 1 FROM frais_classe)
+                    OR EXISTS (SELECT 1 FROM eleves)
+                    OR EXISTS (SELECT 1 FROM paiements)
+                    OR EXISTS (SELECT 1 FROM recus)
+                """
+            )
+            has_data = cursor.fetchone()[0]
+            if not has_data:
+                with open(seed_path, "r", encoding="utf-8") as f:
+                    seed_sql = f.read()
+                try:
+                    # Insère le jeu de test uniquement dans une base encore vide.
+                    conn.executescript(f"BEGIN;\n{seed_sql}\nCOMMIT;")
+                except sqlite3.Error:
+                    if conn.in_transaction:
+                        conn.rollback()
+                    raise
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

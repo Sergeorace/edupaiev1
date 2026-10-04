@@ -30,6 +30,7 @@ class FraisClasseRepository:
             Liste des frais avec type_frais et montant.
         """
         cursor = self.conn.cursor()
+        # Récupère la grille tarifaire d'une classe pour une année scolaire.
         cursor.execute(
             """
             SELECT type_frais, montant, description
@@ -60,6 +61,7 @@ class FraisClasseRepository:
             Somme des frais.
         """
         cursor = self.conn.cursor()
+        # Additionne les lignes de frais de la classe pour l'année demandée.
         cursor.execute(
             """
             SELECT COALESCE(SUM(montant), 0)

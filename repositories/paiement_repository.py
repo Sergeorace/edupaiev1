@@ -31,6 +31,7 @@ class PaiementRepository:
             Le paiement créé avec son ID généré.
         """
         cursor = self.conn.cursor()
+        # Enregistre un paiement en laissant la transaction à l'appelant.
         cursor.execute(
             """
             INSERT INTO paiements (eleve_id, annee_id, montant, date_paiement,
@@ -61,6 +62,7 @@ class PaiementRepository:
             Le paiement trouvé ou None.
         """
         cursor = self.conn.cursor()
+        # Récupère un paiement avec les informations de son année et de l'élève.
         cursor.execute(
             """
             SELECT p.id, p.eleve_id, p.annee_id, a.annee as annee_texte,
@@ -93,7 +95,9 @@ class PaiementRepository:
             Liste des paiements de l'élève.
         """
         cursor = self.conn.cursor()
+        # Liste les paiements de l'élève, éventuellement limités à une année.
         if annee_id:
+            # Filtre les paiements par élève et par année scolaire.
             cursor.execute(
                 """
                 SELECT p.id, p.eleve_id, p.annee_id, a.annee as annee_texte,
@@ -109,6 +113,7 @@ class PaiementRepository:
                 (eleve_id, annee_id),
             )
         else:
+            # Récupère tous les paiements de l'élève, toutes années confondues.
             cursor.execute(
                 """
                 SELECT p.id, p.eleve_id, p.annee_id, a.annee as annee_texte,
@@ -139,7 +144,9 @@ class PaiementRepository:
             Somme des paiements valides (non annulés).
         """
         cursor = self.conn.cursor()
+        # Calcule le total des paiements valides, éventuellement pour une année.
         if annee_id:
+            # Calcule le total valide de l'année demandée.
             cursor.execute(
                 """
                 SELECT COALESCE(SUM(montant), 0)
@@ -149,6 +156,7 @@ class PaiementRepository:
                 (eleve_id, annee_id),
             )
         else:
+            # Calcule le total valide toutes années confondues.
             cursor.execute(
                 """
                 SELECT COALESCE(SUM(montant), 0)
@@ -168,6 +176,7 @@ class PaiementRepository:
             motif_annulation: Motif de l'annulation.
         """
         cursor = self.conn.cursor()
+        # Annule le paiement sans le supprimer et conserve le motif fourni.
         cursor.execute(
             """
             UPDATE paiements

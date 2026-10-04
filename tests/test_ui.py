@@ -3,8 +3,7 @@ Tests UI avec pytest-qt en mode offscreen.
 """
 
 import os
-import sqlite3
-from datetime import date
+from pathlib import Path
 
 # Mode offscreen pour les tests
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -32,18 +31,16 @@ def app():
 @pytest.fixture
 def in_memory_db():
     """Fixture qui crée une base de données en mémoire."""
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    conn = create_connection(":memory:")
 
-    # Création du schéma
-    schema_path = "database/schema.sql"
+    database_dir = Path(__file__).resolve().parents[1] / "database"
+    schema_path = database_dir / "schema.sql"
     with open(schema_path, "r", encoding="utf-8") as f:
         schema_sql = f.read()
         conn.executescript(schema_sql)
 
     # Insertion des données de test
-    seed_path = "database/seed.sql"
+    seed_path = database_dir / "seed.sql"
     with open(seed_path, "r", encoding="utf-8") as f:
         seed_sql = f.read()
         conn.executescript(seed_sql)
