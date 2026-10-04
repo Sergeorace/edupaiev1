@@ -16,6 +16,7 @@ ENV/
 
 # PyInstaller spec files (generated)
 *.spec
+!gestion_scolarite.spec
 
 # IDE
 .vscode/
