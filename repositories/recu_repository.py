@@ -30,6 +30,7 @@ class RecuRepository:
             Le reçu créé avec son ID généré.
         """
         cursor = self.conn.cursor()
+        # Enregistre les données figées du reçu, sans gérer la transaction.
         cursor.execute(
             """
             INSERT INTO recus (numero, paiement_id, annee_id, donnees_json)
@@ -51,6 +52,7 @@ class RecuRepository:
             Le reçu trouvé ou None.
         """
         cursor = self.conn.cursor()
+        # Recherche un reçu à partir de son identifiant interne.
         cursor.execute(
             """
             SELECT id, numero, paiement_id, annee_id, donnees_json, date_generation
@@ -75,6 +77,7 @@ class RecuRepository:
             Le reçu trouvé ou None.
         """
         cursor = self.conn.cursor()
+        # Recherche un reçu à partir de son numéro unique.
         cursor.execute(
             """
             SELECT id, numero, paiement_id, annee_id, donnees_json, date_generation
@@ -99,6 +102,7 @@ class RecuRepository:
             Le reçu trouvé ou None.
         """
         cursor = self.conn.cursor()
+        # Recherche le reçu associé à un paiement.
         cursor.execute(
             """
             SELECT id, numero, paiement_id, annee_id, donnees_json, date_generation
@@ -123,6 +127,7 @@ class RecuRepository:
             Liste des reçus de l'année.
         """
         cursor = self.conn.cursor()
+        # Liste les reçus d'une année dans l'ordre de leur numéro.
         cursor.execute(
             """
             SELECT id, numero, paiement_id, annee_id, donnees_json, date_generation
@@ -145,6 +150,7 @@ class RecuRepository:
             Le dernier numéro de reçu ou None si aucun reçu pour cette année.
         """
         cursor = self.conn.cursor()
+        # Récupère le dernier numéro attribué pour une année donnée.
         cursor.execute(
             """
             SELECT numero

@@ -21,7 +21,7 @@ Cette étape a permis de mettre en place toute la couche données de l'applicati
   - `paiements` : Paiements avec statut (valide/annulé), motif d'annulation
   - `recus` : Reçus avec numéro unique séquentiel et données figées en JSON
 - Contraintes d'intégrité : clés étrangères, CHECK (montant > 0), index pour optimiser les recherches
-- **seed.sql** : Jeu de données de test réaliste avec 1 année, 4 classes, 20 élèves, 40 paiements (couvrant les 3 statuts : impayé, partiel, payé) et 2 paiements annulés
+- **seed.sql** : Jeu de données de test réaliste avec 1 année, 4 classes, 20 élèves, 37 paiements (environ 40, couvrant les 3 statuts : impayé, partiel, payé) et 2 paiements annulés, tous avec leur reçu
 
 #### 3. Module database.py
 - Fonction `create_connection()` : Crée une connexion SQLite avec activation des clés étrangères
@@ -68,6 +68,13 @@ Cette étape a permis de mettre en place toute la couche données de l'applicati
 5. **Archivage vs suppression** : Conformément aux règles métier, les élèves ne sont jamais supprimés mais archivés, ce qui permet de conserver l'historique complet des paiements.
 
 6. **Tests en mémoire** : L'utilisation d'une base SQLite en mémoire (`:memory:`) rend les tests rapides et isolés, sans pollution de la base de développement.
+
+#### Ajustements de cette étape
+
+- La recherche d'élèves utilise une requête SQL fixe et des paramètres : les valeurs saisies ne sont jamais ajoutées au texte SQL.
+- Le repository des élèves ne propose plus de suppression physique ; les élèves sont archivés pour conserver leur historique.
+- La création de la base peut être relancée sans réinsérer les données de test ni provoquer de doublons. Les créations du schéma et du jeu de test sont protégées par des transactions.
+- Les données initiales minimales des tests sont stockées dans `database/test_seed.sql`, pour que les requêtes SQL restent dans la couche données.
 
 ### Hypothèses supplémentaires
 

@@ -3,8 +3,8 @@ Tests unitaires pour les repositories.
 Utilise une base de données SQLite en mémoire.
 """
 
-import sqlite3
 from datetime import date
+from pathlib import Path
 import pytest
 
 from database.database import create_connection, get_transaction
@@ -19,32 +19,18 @@ from models.recu import Recu
 @pytest.fixture
 def in_memory_db():
     """Fixture qui crée une base de données en mémoire avec le schéma."""
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    conn = create_connection(":memory:")
 
-    # Création du schéma
-    schema_path = "database/schema.sql"
+    database_dir = Path(__file__).resolve().parents[1] / "database"
+    schema_path = database_dir / "schema.sql"
     with open(schema_path, "r", encoding="utf-8") as f:
         schema_sql = f.read()
         conn.executescript(schema_sql)
 
-    # Insertion des données de test minimales
-    conn.execute(
-        "INSERT INTO annees_scolaires (annee, date_debut, date_fin) VALUES (?, ?, ?)",
-        ("2025-2026", "2025-09-01", "2026-07-31"),
-    )
-    conn.execute(
-        "INSERT INTO classes (nom, niveau) VALUES (?, ?)", ("6ème A", "Collège")
-    )
-    conn.execute(
-        "INSERT INTO frais_classe (classe_id, annee_id, type_frais, montant, description) VALUES (?, ?, ?, ?, ?)",
-        (1, 1, "Inscription", 25000, "Frais d'inscription"),
-    )
-    conn.execute(
-        "INSERT INTO frais_classe (classe_id, annee_id, type_frais, montant, description) VALUES (?, ?, ?, ?, ?)",
-        (1, 1, "Scolarité", 150000, "Frais de scolarité"),
-    )
+    test_seed_path = database_dir / "test_seed.sql"
+    with open(test_seed_path, "r", encoding="utf-8") as f:
+        test_seed_sql = f.read()
+    conn.executescript(test_seed_sql)
     conn.commit()
 
     yield conn
@@ -175,6 +161,8 @@ class TestEleveRepository:
 
         assert len(results) == 1
         assert results[0].nom == "KOUASSI"
+        assert repo.search(prenom="Jean", matricule="MAT996", classe_id=1) == results
+        assert repo.search(matricule="' OR 1=1 --") == []
 
     def test_archive(self, in_memory_db):
         """Test l'archivage d'un élève."""

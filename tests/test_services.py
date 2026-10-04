@@ -3,8 +3,8 @@ Tests unitaires pour les services.
 Utilise une base de données SQLite en mémoire.
 """
 
-import sqlite3
 from datetime import date, timedelta
+from pathlib import Path
 import pytest
 
 from database.database import create_connection
@@ -31,18 +31,15 @@ from utils.exceptions import (
 @pytest.fixture
 def in_memory_db():
     """Fixture qui crée une base de données en mémoire avec le schéma et les données."""
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    conn = create_connection(":memory:")
 
-    # Création du schéma
-    schema_path = "database/schema.sql"
+    database_dir = Path(__file__).resolve().parents[1] / "database"
+    schema_path = database_dir / "schema.sql"
     with open(schema_path, "r", encoding="utf-8") as f:
         schema_sql = f.read()
         conn.executescript(schema_sql)
 
-    # Insertion des données de test
-    seed_path = "database/seed.sql"
+    seed_path = database_dir / "seed.sql"
     with open(seed_path, "r", encoding="utf-8") as f:
         seed_sql = f.read()
         conn.executescript(seed_sql)
