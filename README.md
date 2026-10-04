@@ -251,6 +251,9 @@ Pour déclencher manuellement :
 ## Hypothèses supplémentaires
 
 - Année scolaire fixe : 2025-2026
+- Les matricules sont normalisés en majuscules et comparés sans distinction de casse.
+- Les dates de naissance et de paiement ne peuvent pas être dans le futur.
+- La séquence des reçus est liée à l'année civile d'émission et redémarre à `00001` chaque nouvelle année.
 - Version PySide6 : 6.11.2 (adaptée à Python 3.13)
 - Version reportlab : 4.2.0
 - Nom de l'établissement : "ÉCOLE EXEMPLE" (configurable dans `reports/recu_generator.py`)

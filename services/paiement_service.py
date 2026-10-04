@@ -2,17 +2,19 @@
 Service pour la gestion des paiements.
 """
 
-import sqlite3
 import json
+import sqlite3
 from datetime import date
-from typing import Optional, Dict, Any
+from typing import List, Optional
 
 from models.paiement import Paiement
-from models.eleve import Eleve
+from models.recu import Recu
+from database.database import get_transaction
 from repositories.paiement_repository import PaiementRepository
 from repositories.eleve_repository import EleveRepository
 from repositories.frais_classe_repository import FraisClasseRepository
-from database.database import get_transaction
+from repositories.recu_repository import RecuRepository
+from services.recu_service import RecuService
 from utils.validators import validate_required, validate_montant, validate_date
 from utils.exceptions import (
     ValidationError,
@@ -147,66 +149,62 @@ class PaiementService:
                 "Le mode de paiement doit être 'Espèces', 'Chèque', 'Virement' ou 'Mobile'."
             )
 
-        # Vérifier que l'élève existe
-        eleve = self.eleve_repo.get_by_id(eleve_id)
-        if not eleve:
-            raise EntiteIntrouvableError(f"Élève avec ID {eleve_id} introuvable.")
+        try:
+            # Verrouille la base avant de contrôler le solde et attribuer un reçu.
+            with get_transaction(self.conn, immediate=True):
+                eleve = self.eleve_repo.get_by_id(eleve_id)
+                if not eleve:
+                    raise EntiteIntrouvableError(
+                        f"Élève avec ID {eleve_id} introuvable."
+                    )
 
-        # Calculer le solde restant
-        solde_restant = self.calculer_solde(eleve_id, annee_id)
+                solde_restant = self.calculer_solde(eleve_id, annee_id)
+                if montant > solde_restant:
+                    raise PaiementSuperieurAuSoldeError(
+                        f"Le paiement de {montant} FCFA dépasse le solde restant "
+                        f"de {solde_restant} FCFA."
+                    )
 
-        # Vérifier que le paiement ne dépasse pas le solde
-        if montant > solde_restant:
-            raise PaiementSuperieurAuSoldeError(
-                f"Le paiement de {montant} FCFA dépasse le solde restant de {solde_restant} FCFA."
-            )
+                paiement = Paiement(
+                    id=0,
+                    eleve_id=eleve_id,
+                    annee_id=annee_id,
+                    montant=montant,
+                    date_paiement=date_paiement,
+                    mode_paiement=mode_paiement,
+                    motif=motif,
+                    statut="valide",
+                )
+                paiement = self.paiement_repo.create(paiement)
 
-        # Transaction : insertion du paiement + génération du reçu
-        with get_transaction(self.conn) as cursor:
-            # 1. Insérer le paiement
-            paiement = Paiement(
-                id=0,
-                eleve_id=eleve_id,
-                annee_id=annee_id,
-                montant=montant,
-                date_paiement=date_paiement,
-                mode_paiement=mode_paiement,
-                motif=motif,
-                statut="valide",
-            )
-            paiement = self.paiement_repo.create(paiement)
+                total_paye_apres = self.calculer_total_paye(eleve_id, annee_id)
+                solde_apres = self.calculer_solde(eleve_id, annee_id)
+                donnees_recu = {
+                    "nom": eleve.nom_complet,
+                    "classe": eleve.classe_nom or f"Classe {eleve.classe_id}",
+                    "montant": montant,
+                    "total_paye": total_paye_apres,
+                    "solde": solde_apres,
+                    "date_paiement": date_paiement.isoformat(),
+                }
 
-            # 2. Préparer les données figées du reçu
-            total_paye_apres = self.calculer_total_paye(eleve_id, annee_id)
-            solde_apres = self.calculer_solde(eleve_id, annee_id)
-
-            donnees_recu = {
-                "nom": eleve.nom_complet,
-                "classe": eleve.classe_nom or f"Classe {eleve.classe_id}",
-                "montant": montant,
-                "total_paye": total_paye_apres,
-                "solde": solde_apres,
-                "date_paiement": date_paiement.isoformat(),
-            }
-
-            # 3. Générer le numéro de reçu
-            numero_recu = self._generer_numero_recu(annee_id)
-
-            # 4. Insérer le reçu
-            from models.recu import Recu
-            from repositories.recu_repository import RecuRepository
-
-            recu_repo = RecuRepository(self.conn)
-            recu = Recu(
-                id=0,
-                numero=numero_recu,
-                paiement_id=paiement.id,
-                annee_id=annee_id,
-                donnees_json=json.dumps(donnees_recu),
-            )
-            recu_repo.create(recu)
-
-        return paiement
+                recu = RecuRepository(self.conn)
+                numero_recu = RecuService(self.conn).generer_numero_recu(annee_id)
+                recu.create(
+                    Recu(
+                        id=0,
+                        numero=numero_recu,
+                        paiement_id=paiement.id,
+                        annee_id=annee_id,
+                        donnees_json=json.dumps(donnees_recu, ensure_ascii=False),
+                    )
+                )
+            return paiement
+        except sqlite3.IntegrityError as error:
+            raise RegleMetierError(
+                "Le paiement n'a pas pu être enregistré. Vérifiez l'élève, "
+                "l'année scolaire et le reçu."
+            ) from error
 
     def annuler_paiement(self, paiement_id: int, motif_annulation: str) -> None:
         """
@@ -223,17 +221,22 @@ class PaiementService:
         """
         validate_required(motif_annulation, "motif d'annulation")
 
-        # Vérifier que le paiement existe
-        paiement = self.paiement_repo.get_by_id(paiement_id)
-        if not paiement:
-            raise EntiteIntrouvableError(f"Paiement avec ID {paiement_id} introuvable.")
+        try:
+            with get_transaction(self.conn, immediate=True):
+                paiement = self.paiement_repo.get_by_id(paiement_id)
+                if not paiement:
+                    raise EntiteIntrouvableError(
+                        f"Paiement avec ID {paiement_id} introuvable."
+                    )
 
-        # Vérifier que le paiement n'est pas déjà annulé
-        if paiement.statut == "annule":
-            raise RegleMetierError("Ce paiement est déjà annulé.")
+                if paiement.statut == "annule":
+                    raise RegleMetierError("Ce paiement est déjà annulé.")
 
-        # Annuler le paiement
-        self.paiement_repo.annuler(paiement_id, motif_annulation)
+                self.paiement_repo.annuler(paiement_id, motif_annulation.strip())
+        except sqlite3.IntegrityError as error:
+            raise RegleMetierError(
+                "Le paiement n'a pas pu être annulé. Vérifiez son état."
+            ) from error
 
     def get_paiements_eleve(self, eleve_id: int, annee_id: int) -> List[Paiement]:
         """
@@ -259,30 +262,3 @@ class PaiementService:
             Le paiement trouvé ou None.
         """
         return self.paiement_repo.get_by_id(paiement_id)
-
-    def _generer_numero_recu(self, annee_id: int) -> str:
-        """
-        Génère un numéro de reçu unique pour une année.
-
-        Args:
-            annee_id: ID de l'année scolaire.
-
-        Returns:
-            Numéro de reçu au format REC-AAAA-NNNNN.
-        """
-        from repositories.recu_repository import RecuRepository
-        from utils.date_utils import get_annee_civile
-
-        recu_repo = RecuRepository(self.conn)
-        last_numero = recu_repo.get_last_numero(annee_id)
-
-        annee_civile = get_annee_civile()
-
-        if last_numero:
-            # Extraire le numéro séquentiel et l'incrémenter
-            last_seq = int(last_numero.split("-")[2])
-            new_seq = last_seq + 1
-        else:
-            new_seq = 1
-
-        return f"REC-{annee_civile}-{new_seq:05d}"
