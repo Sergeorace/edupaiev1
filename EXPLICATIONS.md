@@ -75,3 +75,4 @@ Cette étape a permis de mettre en place toute la couche données de l'applicati
 - Les dates sont stockées au format ISO (YYYY-MM-DD)
 - Le numéro de reçu suit le format REC-AAAA-NNNNN où AAAA est l'année civile et NNNNN un numéro séquentiel
 - Les modes de paiement possibles sont : Espèces, Chèque, Virement, Mobile
+- Version de PySide6 adaptée à Python 3.13 : 6.11.2 (au lieu de 6.6.3.1 initialement prévu)

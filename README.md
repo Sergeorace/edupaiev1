@@ -34,3 +34,4 @@ pytest
 - Montants entiers
 - Un élève n'est jamais supprimé (archivage uniquement)
 - Un paiement n'est jamais supprimé (annulation possible)
+- Version PySide6 : 6.11.2 (adaptée à Python 3.13)
