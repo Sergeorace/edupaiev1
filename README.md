@@ -99,6 +99,29 @@ pytest tests/test_services.py
 pytest tests/test_recu_generator.py
 ```
 
+## Écrans de l'application
+
+- **Tableau de bord** : total encaissé, reste à payer, nombre d'élèves par
+  statut et derniers paiements.
+- **Élèves** : recherche par nom, prénom ou matricule, filtres de classe et de
+  statut, solde coloré et actions pour ajouter, modifier, consulter la fiche,
+  payer ou archiver un élève.
+- **Reçus** : historique consultable/recherchable, export PDF et impression.
+  Un reçu demeure visible même si le paiement associé est ensuite annulé.
+
+Les captures ci-dessous ont été produites avec Qt en mode offscreen en appelant
+`widget.grab()` :
+
+| Tableau de bord | Élèves | Reçus |
+|---|---|---|
+| ![Tableau de bord](screenshots/dashboard.png) | ![Gestion des élèves](screenshots/eleves.png) | ![Historique des reçus](screenshots/recus.png) |
+
+Pour les régénérer après avoir créé la base d'exemple :
+
+```bash
+python -m tests.generate_screenshots
+```
+
 ## Règles métier
 
 ### Année scolaire et frais
@@ -259,3 +282,5 @@ Pour déclencher manuellement :
 - Nom de l'établissement : "ÉCOLE EXEMPLE" (configurable dans `reports/recu_generator.py`)
 - L'exécutable Windows ne peut pas être testé depuis Linux (limitation de l'environnement)
 - Le jeu de données d'exemple conserve aussi les reçus des paiements annulés, conformément à la règle métier.
+- Le formulaire utilise les identifiants de classes 1 à 4, correspondant aux quatre classes du jeu de démonstration.
+- Les captures d'écran sont faites à partir de `school.db` ; elles reflètent les données d'exemple si cette base a été initialisée sans modifications utilisateur.

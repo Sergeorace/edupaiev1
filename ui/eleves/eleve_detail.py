@@ -2,7 +2,8 @@
 Fiche détaillée d'un élève.
 """
 
-import sqlite3
+from typing import Any, Optional
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox,
     QHeaderView,
+    QWidget,
 )
 from PySide6.QtCore import Qt
 
@@ -21,12 +23,23 @@ from services.paiement_service import PaiementService
 from services.recu_service import RecuService
 from utils.formatters import format_montant, format_date
 from ui.recus.recu_viewer import open_recu_direct
+from ui.error_handling import run_service_operation
+from models.eleve import Eleve
+from models.paiement import Paiement
+from models.recu import Recu
+from utils.date_utils import parse_date
 
 
 class EleveDetailDialog(QDialog):
     """Dialogue de fiche d'élève."""
 
-    def __init__(self, conn: sqlite3.Connection, eleve_id: int, annee_id: int):
+    def __init__(
+        self,
+        conn: Any,
+        eleve_id: int,
+        annee_id: int,
+        parent: Optional[QWidget] = None,
+    ) -> None:
         """
         Initialise le dialogue.
 
@@ -35,7 +48,7 @@ class EleveDetailDialog(QDialog):
             eleve_id: ID de l'élève.
             annee_id: ID de l'année scolaire.
         """
-        super().__init__()
+        super().__init__(parent)
         self.conn = conn
         self.eleve_service = EleveService(conn)
         self.paiement_service = PaiementService(conn)
@@ -46,7 +59,7 @@ class EleveDetailDialog(QDialog):
         self.setWindowTitle("Fiche élève")
         self.setMinimumSize(700, 600)
 
-        self.paiement_ids = []
+        self.paiement_ids: list[int] = []
 
         self._setup_ui()
         self._load_data()
@@ -137,47 +150,71 @@ class EleveDetailDialog(QDialog):
 
     def _load_data(self) -> None:
         """Charge les données de l'élève."""
-        try:
-            # Informations de l'élève
-            eleve = self.eleve_service.get_eleve_by_id(self.eleve_id)
-            if not eleve:
-                QMessageBox.critical(self, "Erreur", "Élève introuvable.")
-                self.reject()
-                return
+        success, result = run_service_operation(
+            self, "le chargement de la fiche élève", self._get_data
+        )
+        if not success or result is None:
+            return
 
-            self.info_label.setText(
-                f"{eleve.nom_complet} - {eleve.classe_nom or 'Classe inconnue'}"
-            )
+        eleve, frais_dus, total_paye, solde, statut, paiements, recus = result
+        if eleve is None:
+            QMessageBox.warning(self, "Élève introuvable", "Cet élève n'existe plus.")
+            self.reject()
+            return
 
-            # Statistiques financières
-            frais_dus = self.paiement_service.calculer_frais_dus(self.eleve_id, self.annee_id)
-            total_paye = self.paiement_service.calculer_total_paye(
-                self.eleve_id, self.annee_id
-            )
-            solde = self.paiement_service.calculer_solde(self.eleve_id, self.annee_id)
-            statut = self.paiement_service.calculer_statut(self.eleve_id, self.annee_id)
+        self.info_label.setText(
+            f"{eleve.nom_complet} · {eleve.classe_nom or 'Classe inconnue'}"
+        )
+        self.lbl_frais_dus.setText(f"Frais dus : {format_montant(frais_dus)}")
+        self.lbl_total_paye.setText(f"Total payé : {format_montant(total_paye)}")
+        self.lbl_solde.setText(f"Solde : {format_montant(solde)}")
+        self.lbl_statut.setText(f"Statut : {statut}")
+        status_colors = {
+            "Impayé": "#e74c3c",
+            "Partiel": "#d97706",
+            "Payé": "#16804a",
+        }
+        self.lbl_statut.setStyleSheet(
+            f"font-size: 14px; font-weight: bold; "
+            f"color: {status_colors.get(statut, '#2c3e50')};"
+        )
+        self._update_paiements_table(paiements, recus)
 
-            self.lbl_frais_dus.setText(f"Frais dus: {format_montant(frais_dus)}")
-            self.lbl_total_paye.setText(f"Total payé: {format_montant(total_paye)}")
-            self.lbl_solde.setText(f"Solde: {format_montant(solde)}")
-            self.lbl_statut.setText(f"Statut: {statut}")
+    def _get_data(
+        self,
+    ) -> tuple[
+        Optional[Eleve],
+        int,
+        int,
+        int,
+        str,
+        list[Paiement],
+        dict[int, Optional[Recu]],
+    ]:
+        """Récupère les données de la fiche uniquement par les services."""
+        eleve = self.eleve_service.get_eleve_by_id(self.eleve_id)
+        if eleve is None:
+            return None, 0, 0, 0, "", [], {}
+        paiements = self.paiement_service.get_paiements_eleve(
+            self.eleve_id, self.annee_id
+        )
+        recus = {
+            paiement.id: self.recu_service.get_recu_by_paiement(paiement.id)
+            for paiement in paiements
+        }
+        return (
+            eleve,
+            self.paiement_service.calculer_frais_dus(self.eleve_id, self.annee_id),
+            self.paiement_service.calculer_total_paye(self.eleve_id, self.annee_id),
+            self.paiement_service.calculer_solde(self.eleve_id, self.annee_id),
+            self.paiement_service.calculer_statut(self.eleve_id, self.annee_id),
+            paiements,
+            recus,
+        )
 
-            # Couleur du statut
-            if statut == "Impayé":
-                self.lbl_statut.setStyleSheet("font-size: 14px; font-weight: bold; color: #e74c3c;")
-            elif statut == "Partiel":
-                self.lbl_statut.setStyleSheet("font-size: 14px; font-weight: bold; color: #f39c12;")
-            else:
-                self.lbl_statut.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;")
-
-            # Historique des paiements
-            paiements = self.paiement_service.get_paiements_eleve(self.eleve_id, self.annee_id)
-            self._update_paiements_table(paiements)
-
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors du chargement: {str(e)}")
-
-    def _update_paiements_table(self, paiements: list) -> None:
+    def _update_paiements_table(
+        self, paiements: list[Paiement], recus: dict[int, Optional[Recu]]
+    ) -> None:
         """
         Met à jour le tableau des paiements.
 
@@ -191,7 +228,10 @@ class EleveDetailDialog(QDialog):
             self.paiement_ids.append(paiement.id)
 
             # Date
-            date_item = QTableWidgetItem(format_date(paiement.date_paiement))
+            date_paiement = paiement.date_paiement
+            if isinstance(date_paiement, str):
+                date_paiement = parse_date(date_paiement)
+            date_item = QTableWidgetItem(format_date(date_paiement))
             self.table_paiements.setItem(row, 0, date_item)
 
             # Montant
@@ -208,11 +248,14 @@ class EleveDetailDialog(QDialog):
             self.table_paiements.setItem(row, 3, motif_item)
 
             # Statut
-            statut_item = QTableWidgetItem(paiement.statut.capitalize())
+            libelle_statut = "Annulé" if paiement.statut == "annule" else "Valide"
+            statut_item = QTableWidgetItem(libelle_statut)
+            if paiement.statut == "annule":
+                statut_item.setForeground(Qt.GlobalColor.red)
             self.table_paiements.setItem(row, 4, statut_item)
 
             # Reçu
-            recu = self.recu_service.get_recu_by_paiement(paiement.id)
+            recu = recus.get(paiement.id)
             if recu:
                 recu_item = QTableWidgetItem(recu.numero)
                 recu_item.setForeground(Qt.GlobalColor.blue)
@@ -250,7 +293,7 @@ class EleveDetailDialog(QDialog):
                 return
 
             paiement_id = self.paiement_ids[row]
-            open_recu_direct(self.conn, paiement_id)
+            open_recu_direct(self.conn, paiement_id, self)
 
     def _on_annuler_paiement(self) -> None:
         """Gère l'annulation d'un paiement."""
@@ -271,10 +314,14 @@ class EleveDetailDialog(QDialog):
             self, "Motif d'annulation", "Motif de l'annulation:"
         )
 
-        if ok and motif:
-            try:
-                self.paiement_service.annuler_paiement(paiement_id, motif)
+        if ok and motif.strip():
+            success, _ = run_service_operation(
+                self,
+                "l'annulation du paiement",
+                lambda: self.paiement_service.annuler_paiement(
+                    paiement_id, motif.strip()
+                ),
+            )
+            if success:
                 QMessageBox.information(self, "Succès", "Le paiement a été annulé.")
                 self._load_data()
-            except Exception as e:
-                QMessageBox.critical(self, "Erreur", str(e))

@@ -2,7 +2,7 @@
 Widget de visualisation et gestion des reçus.
 """
 
-import sqlite3
+from typing import Any, Optional
 from pathlib import Path
 from datetime import datetime
 
@@ -17,30 +17,36 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QMessageBox,
     QFileDialog,
-    QPrintDialog,
     QMenu,
+    QWidget,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
-from PySide6.QtPrintSupport import QPrinter
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtGui import QAction, QPainter
+from PySide6.QtCore import QPoint
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter
+from PySide6.QtPdf import QPdfDocument
 
 from services.recu_service import RecuService
 from services.paiement_service import PaiementService
+from models.paiement import Paiement
+from models.recu import Recu
 from utils.formatters import format_montant, format_date
 from reports.recu_generator import generer_pdf_recu
+from ui.error_handling import run_service_operation
+from utils.date_utils import parse_date
 
 
 class RecusViewerWidget(QWidget):
     """Widget de visualisation des reçus."""
 
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: Any, parent: Optional[QWidget] = None) -> None:
         """
         Initialise le widget de visualisation des reçus.
 
         Args:
             conn: Connexion SQLite à utiliser.
         """
-        super().__init__()
+        super().__init__(parent)
         self.conn = conn
         self.recu_service = RecuService(conn)
         self.paiement_service = PaiementService(conn)
@@ -59,21 +65,9 @@ class RecusViewerWidget(QWidget):
         layout.setSpacing(15)
 
         # Titre
-        title = QPushButton("📄 Gestion des reçus")
+        title = QPushButton("Gestion des reçus")
+        title.setObjectName("title")
         title.setCheckable(False)
-        title.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                color: #2c3e50;
-                font-size: 24px;
-                font-weight: bold;
-                text-align: left;
-                padding: 0;
-            }
-        """
-        )
         layout.addWidget(title)
 
         # Barre de recherche
@@ -85,7 +79,7 @@ class RecusViewerWidget(QWidget):
         self.search_input.textChanged.connect(self._on_search_changed)
         search_layout.addWidget(self.search_input, stretch=1)
 
-        self.btn_rechercher = QPushButton("🔍 Rechercher")
+        self.btn_rechercher = QPushButton("Rechercher")
         self.btn_rechercher.clicked.connect(self._on_search_changed)
         search_layout.addWidget(self.btn_rechercher)
 
@@ -127,12 +121,12 @@ class RecusViewerWidget(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(10)
 
-        self.btn_exporter = QPushButton("📥 Exporter PDF")
+        self.btn_exporter = QPushButton("Exporter PDF")
         self.btn_exporter.clicked.connect(self._on_exporter_pdf)
         self.btn_exporter.setEnabled(False)
         buttons_layout.addWidget(self.btn_exporter)
 
-        self.btn_imprimer = QPushButton("🖨️ Imprimer")
+        self.btn_imprimer = QPushButton("Imprimer")
         self.btn_imprimer.clicked.connect(self._on_imprimer)
         self.btn_imprimer.setEnabled(False)
         buttons_layout.addWidget(self.btn_imprimer)
@@ -150,33 +144,42 @@ class RecusViewerWidget(QWidget):
         Args:
             search_text: Texte de recherche (numéro ou nom d'élève).
         """
-        try:
+        def get_filtered_recus() -> tuple[
+            list[Recu], dict[int, Optional[Paiement]]
+        ]:
             recus = self.recu_service.get_recus_by_annee(self.annee_id)
-
-            # Filtrer par recherche
             if search_text:
                 search_lower = search_text.lower()
                 filtered = []
                 for recu in recus:
-                    donnees = recu.donnees_json
+                    donnees = recu.get_donnees()
                     if (
                         search_lower in recu.numero.lower()
-                        or search_lower in donnees.get("nom", "").lower()
-                        or search_lower in donnees.get("classe", "").lower()
+                        or search_lower in donnees.get("nom", "").casefold()
+                        or search_lower in donnees.get("classe", "").casefold()
                     ):
                         filtered.append(recu)
                 recus = filtered
+            paiements = {
+                recu.paiement_id: self.paiement_service.get_paiement_by_id(
+                    recu.paiement_id
+                )
+                for recu in recus
+            }
+            return recus, paiements
 
-            self._update_recus_table(recus)
+        success, result = run_service_operation(
+            self, "le chargement des reçus", get_filtered_recus
+        )
+        if success and result is not None:
+            recus, paiements = result
+            self._update_recus_table(recus, paiements)
 
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Erreur",
-                f"Erreur lors du chargement des reçus: {str(e)}",
-            )
-
-    def _update_recus_table(self, recus: list) -> None:
+    def _update_recus_table(
+        self,
+        recus: list[Recu],
+        paiements: dict[int, Optional[Paiement]],
+    ) -> None:
         """
         Met à jour le tableau des reçus.
 
@@ -191,7 +194,7 @@ class RecusViewerWidget(QWidget):
             self.recu_ids.append(recu.id)
             self.paiement_ids.append(recu.paiement_id)
 
-            donnees = recu.donnees_json
+            donnees = recu.get_donnees()
 
             # Numéro
             numero_item = QTableWidgetItem(recu.numero)
@@ -212,19 +215,28 @@ class RecusViewerWidget(QWidget):
             self.table_recus.setItem(row, 3, montant_item)
 
             # Date paiement
-            date_paiement_item = QTableWidgetItem(donnees.get("date_paiement", ""))
+            date_paiement = donnees.get("date_paiement", "")
+            if date_paiement:
+                date_paiement = format_date(parse_date(date_paiement))
+            date_paiement_item = QTableWidgetItem(date_paiement)
             self.table_recus.setItem(row, 4, date_paiement_item)
 
             # Date reçu
-            date_recu = datetime.fromisoformat(recu.date_generation).strftime("%d/%m/%Y %H:%M")
+            date_recu = (
+                datetime.fromisoformat(recu.date_generation).strftime("%d/%m/%Y %H:%M")
+                if recu.date_generation
+                else ""
+            )
             date_recu_item = QTableWidgetItem(date_recu)
             self.table_recus.setItem(row, 5, date_recu_item)
 
             # Statut du paiement
-            paiement = self.paiement_service.get_paiement_by_id(recu.paiement_id)
+            paiement = paiements.get(recu.paiement_id)
             if paiement:
-                statut_item = QTableWidgetItem(paiement.statut.capitalize())
-                if paiement.statut == "annulé":
+                statut_item = QTableWidgetItem(
+                    "Annulé" if paiement.statut == "annule" else "Valide"
+                )
+                if paiement.statut == "annule":
                     statut_item.setForeground(Qt.GlobalColor.red)
                 self.table_recus.setItem(row, 6, statut_item)
             else:
@@ -244,7 +256,7 @@ class RecusViewerWidget(QWidget):
         self.btn_exporter.setEnabled(has_selection)
         self.btn_imprimer.setEnabled(has_selection)
 
-    def _show_context_menu(self, position) -> None:
+    def _show_context_menu(self, position: QPoint) -> None:
         """
         Affiche le menu contextuel.
 
@@ -267,7 +279,9 @@ class RecusViewerWidget(QWidget):
 
         menu.exec(self.table_recus.mapToGlobal(position))
 
-    def _get_selected_recu(self):
+    def _get_selected_recu(
+        self,
+    ) -> tuple[Optional[Recu], Optional[Paiement]]:
         """
         Récupère le reçu sélectionné.
 
@@ -285,10 +299,15 @@ class RecusViewerWidget(QWidget):
         recu_id = self.recu_ids[row]
         paiement_id = self.paiement_ids[row]
 
-        recu = self.recu_service.get_recu_by_id(recu_id)
-        paiement = self.paiement_service.get_paiement_by_id(paiement_id)
-
-        return recu, paiement
+        success, result = run_service_operation(
+            self,
+            "la récupération du reçu",
+            lambda: (
+                self.recu_service.get_recu_by_id(recu_id),
+                self.paiement_service.get_paiement_by_id(paiement_id),
+            ),
+        )
+        return result if success and result is not None else (None, None)
 
     def _on_exporter_pdf(self) -> None:
         """Gère l'export en PDF."""
@@ -296,7 +315,7 @@ class RecusViewerWidget(QWidget):
         if not recu:
             return
 
-        try:
+        def export_recu() -> Optional[Path]:
             # Demander le chemin de sauvegarde
             default_name = f"recu_{recu.numero}.pdf"
             file_path, _ = QFileDialog.getSaveFileName(
@@ -307,11 +326,13 @@ class RecusViewerWidget(QWidget):
             )
 
             if not file_path:
-                return
+                return None
 
             # Générer le PDF
-            statut_paiement = paiement.statut if paiement else "valide"
-            generer_pdf_recu(
+            statut_paiement = (
+                "annulé" if paiement and paiement.statut == "annule" else "valide"
+            )
+            return generer_pdf_recu(
                 recu.donnees_json,
                 recu.numero,
                 recu.date_generation,
@@ -319,17 +340,12 @@ class RecusViewerWidget(QWidget):
                 Path(file_path),
             )
 
+        success, file_path = run_service_operation(
+            self, "l'export PDF du reçu", export_recu
+        )
+        if success and file_path is not None:
             QMessageBox.information(
-                self,
-                "Succès",
-                f"Le reçu a été exporté avec succès :\n{file_path}",
-            )
-
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Erreur",
-                f"Erreur lors de l'export PDF: {str(e)}",
+                self, "Succès", f"Le reçu a été exporté :\n{file_path}"
             )
 
     def _on_imprimer(self) -> None:
@@ -338,46 +354,73 @@ class RecusViewerWidget(QWidget):
         if not recu:
             return
 
-        try:
+        def print_recu() -> None:
             # Générer le PDF temporaire
             import tempfile
 
             with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
                 temp_path = Path(tmp.name)
 
-            statut_paiement = paiement.statut if paiement else "valide"
-            generer_pdf_recu(
-                recu.donnees_json,
-                recu.numero,
-                recu.date_generation,
-                statut_paiement,
-                temp_path,
-            )
+            document: Optional[QPdfDocument] = None
+            try:
+                statut_paiement = (
+                    "annulé" if paiement and paiement.statut == "annule" else "valide"
+                )
+                generer_pdf_recu(
+                    recu.donnees_json,
+                    recu.numero,
+                    recu.date_generation,
+                    statut_paiement,
+                    temp_path,
+                )
 
-            # Ouvrir la boîte de dialogue d'impression
-            printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-            dialog = QPrintDialog(printer, self)
+                printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+                dialog = QPrintDialog(printer, self)
+                if dialog.exec() != QPrintDialog.DialogCode.Accepted:
+                    return
 
-            if dialog.exec() == QPrintDialog.DialogCode.Accepted:
-                # Imprimer le PDF
-                from PySide6.QtGui import QTextDocument
+                document = QPdfDocument()
+                load_error = document.load(str(temp_path))
+                if load_error != QPdfDocument.Error.None_:
+                    raise RuntimeError("Le reçu PDF n'a pas pu être chargé.")
 
-                doc = QTextDocument()
-                doc.setHtml(f"<iframe src='{temp_path}'></iframe>")
-                doc.print(printer)
+                painter = QPainter()
+                if not painter.begin(printer):
+                    raise RuntimeError("L'impression n'a pas pu démarrer.")
+                try:
+                    page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
+                    page_size = page_rect.size().toSize()
+                    for page_index in range(document.pageCount()):
+                        if page_index:
+                            printer.newPage()
+                        image = document.render(page_index, page_size)
+                        if image.isNull():
+                            raise RuntimeError("Une page du reçu PDF est illisible.")
+                        position = QPoint(
+                            int(
+                                page_rect.x()
+                                + (page_size.width() - image.width()) // 2
+                            ),
+                            int(
+                                page_rect.y()
+                                + (page_size.height() - image.height()) // 2
+                            ),
+                        )
+                        painter.drawImage(position, image)
+                finally:
+                    painter.end()
+            finally:
+                if document is not None:
+                    document.close()
+                    document = None
+                temp_path.unlink(missing_ok=True)
 
-            # Supprimer le fichier temporaire
-            temp_path.unlink(missing_ok=True)
-
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Erreur",
-                f"Erreur lors de l'impression: {str(e)}",
-            )
+        run_service_operation(self, "l'impression du reçu", print_recu)
 
 
-def open_recu_direct(conn: sqlite3.Connection, paiement_id: int) -> None:
+def open_recu_direct(
+    conn: Any, paiement_id: int, parent: Optional[QWidget] = None
+) -> None:
     """
     Ouvre directement le reçu d'un paiement.
 
@@ -386,13 +429,24 @@ def open_recu_direct(conn: sqlite3.Connection, paiement_id: int) -> None:
         paiement_id: ID du paiement.
     """
     recu_service = RecuService(conn)
-    recu = recu_service.get_recu_by_paiement(paiement_id)
+    def fetch_recu_and_payment():
+        recu = recu_service.get_recu_by_paiement(paiement_id)
+        paiement = PaiementService(conn).get_paiement_by_id(paiement_id)
+        return recu, paiement
 
-    if not recu:
-        QMessageBox.critical(None, "Erreur", "Aucun reçu trouvé pour ce paiement.")
+    success, result = run_service_operation(
+        parent,
+        "la récupération du reçu",
+        fetch_recu_and_payment,
+    )
+    if not success or result is None:
+        return
+    recu, paiement = result
+    if recu is None:
+        QMessageBox.warning(parent, "Reçu introuvable", "Aucun reçu trouvé.")
         return
 
-    try:
+    def export_recu() -> Optional[Path]:
         # Demander le chemin de sauvegarde
         default_name = f"recu_{recu.numero}.pdf"
         file_path, _ = QFileDialog.getSaveFileName(
@@ -403,30 +457,23 @@ def open_recu_direct(conn: sqlite3.Connection, paiement_id: int) -> None:
         )
 
         if not file_path:
-            return
+            return None
 
         # Générer le PDF
-        paiement_service = PaiementService(conn)
-        paiement = paiement_service.get_paiement_by_id(paiement_id)
-        statut_paiement = paiement.statut if paiement else "valide"
-
-        generer_pdf_recu(
+        return generer_pdf_recu(
             recu.donnees_json,
             recu.numero,
             recu.date_generation,
-            statut_paiement,
+            "annulé" if paiement and paiement.statut == "annule" else "valide",
             Path(file_path),
         )
 
+    success, file_path = run_service_operation(
+        parent, "l'export PDF du reçu", export_recu
+    )
+    if success and file_path is not None:
         QMessageBox.information(
-            None,
+            parent,
             "Succès",
-            f"Le reçu a été exporté avec succès :\n{file_path}",
-        )
-
-    except Exception as e:
-        QMessageBox.critical(
-            None,
-            "Erreur",
-            f"Erreur lors de l'export PDF: {str(e)}",
+            f"Le reçu a été exporté :\n{file_path}",
         )

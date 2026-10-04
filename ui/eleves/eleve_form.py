@@ -2,7 +2,8 @@
 Formulaire d'ajout/modification d'élève.
 """
 
-from datetime import date
+from typing import Any, Optional
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -13,17 +14,21 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QPushButton,
     QMessageBox,
+    QWidget,
 )
 from PySide6.QtCore import Qt, QDate
 
 from services.eleve_service import EleveService
 from models.eleve import Eleve
+from ui.error_handling import run_service_operation
 
 
 class EleveFormDialog(QDialog):
     """Dialogue de formulaire d'élève."""
 
-    def __init__(self, conn: sqlite3.Connection, parent=None, eleve: Eleve = None):
+    def __init__(
+        self, conn: Any, parent: Optional[QWidget] = None, eleve: Optional[Eleve] = None
+    ) -> None:
         """
         Initialise le dialogue.
 
@@ -86,6 +91,7 @@ class EleveFormDialog(QDialog):
         self.naissance_input = QDateEdit()
         self.naissance_input.setCalendarPopup(True)
         self.naissance_input.setDate(QDate.currentDate())
+        self.naissance_input.setMaximumDate(QDate.currentDate())
         naissance_layout.addWidget(naissance_label)
         naissance_layout.addWidget(self.naissance_input)
         layout.addLayout(naissance_layout)
@@ -173,19 +179,20 @@ class EleveFormDialog(QDialog):
 
     def _on_enregistrer(self) -> None:
         """Gère l'enregistrement de l'élève."""
-        try:
-            matricule = self.matricule_input.text().strip()
-            nom = self.nom_input.text().strip()
-            prenom = self.prenom_input.text().strip()
-            date_naissance = self.naissance_input.date().toPython()
-            sexe = self.sexe_input.currentText()
-            classe_id = self.classe_input.currentData()
-            tuteur = self.tuteur_input.text().strip()
-            telephone = self.telephone_input.text().strip()
+        matricule = self.matricule_input.text().strip()
+        nom = self.nom_input.text().strip()
+        prenom = self.prenom_input.text().strip()
+        date_naissance = self.naissance_input.date().toPython()
+        sexe = self.sexe_input.currentText()
+        classe_id = self.classe_input.currentData()
+        tuteur = self.tuteur_input.text().strip()
+        telephone = self.telephone_input.text().strip()
 
-            if self.eleve:
-                # Modification
-                self.service.update_eleve(
+        if self.eleve is not None:
+            success, _ = run_service_operation(
+                self,
+                "la modification de l'élève",
+                lambda: self.service.update_eleve(
                     self.eleve.id,
                     matricule,
                     nom,
@@ -195,11 +202,14 @@ class EleveFormDialog(QDialog):
                     classe_id,
                     tuteur,
                     telephone,
-                )
-                QMessageBox.information(self, "Succès", "L'élève a été modifié avec succès.")
-            else:
-                # Ajout
-                self.service.create_eleve(
+                ),
+            )
+            message = "L'élève a été modifié avec succès."
+        else:
+            success, _ = run_service_operation(
+                self,
+                "la création de l'élève",
+                lambda: self.service.create_eleve(
                     matricule,
                     nom,
                     prenom,
@@ -208,10 +218,10 @@ class EleveFormDialog(QDialog):
                     classe_id,
                     tuteur,
                     telephone,
-                )
-                QMessageBox.information(self, "Succès", "L'élève a été ajouté avec succès.")
+                ),
+            )
+            message = "L'élève a été ajouté avec succès."
 
+        if success:
+            QMessageBox.information(self, "Succès", message)
             self.accept()
-
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", str(e))

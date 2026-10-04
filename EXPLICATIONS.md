@@ -687,3 +687,48 @@ R : Deux documents avec des objectifs différents :
 - **EXPLICATIONS.md** : Pour la soutenance (architecture, décisions techniques, flux détaillés)
 - **Complémentarité** : Chaque document a son public et son objectif
 - **Rédaction** : EXPLICATIONS.md est rédigé en langage simple pour faciliter la défense orale
+
+---
+
+## ÉTAPE 3/4 : Interface PySide6
+
+### Ce qui a été réalisé
+
+L'application dispose maintenant de ses écrans graphiques. La fenêtre principale
+présente une barre latérale et trois pages : le tableau de bord, la gestion des
+élèves et l'historique des reçus.
+
+- Dans **Élèves**, on peut rechercher un élève par nom, prénom ou matricule,
+  filtrer par classe et par situation de paiement, puis ouvrir les formulaires
+  d'ajout/modification, la fiche, le paiement ou l'archivage.
+- La **fiche élève** résume les frais, les paiements et le solde. Son tableau
+  conserve aussi les paiements annulés et permet de retrouver le reçu.
+- La fenêtre de **paiement** montre le solde avant et après. Elle signale un
+  montant qui dépasse le solde et désactive le bouton d'enregistrement.
+- Le **tableau de bord** présente les sommes encaissées et restant dues, le
+  nombre d'élèves par statut ainsi que les paiements récents.
+- Dans **Reçus**, on peut rechercher, exporter en PDF et imprimer. Le statut
+  annulé reste visible, car l'annulation ne supprime pas le reçu.
+
+Les widgets ne parlent qu'aux services ; ils n'importent pas `sqlite3` et ne
+contiennent pas de requête SQL. Un gestionnaire commun présente les erreurs de
+validation et les règles métier. Les erreurs inattendues sont inscrites dans
+les journaux avant d'afficher un message générique.
+
+Des tests pytest-qt vérifient l'ouverture de la fenêtre, la recherche, les
+filtres, l'ajout d'un élève et le refus d'un paiement excessif sans insertion en
+base. Des captures des trois pages sont générées en mode offscreen avec
+`widget.grab()` et sont disponibles dans `screenshots/`.
+
+### Points à expliquer à l'oral
+
+1. **Les couches restent séparées** : le widget récupère les données par un
+   service ; le service utilise les repositories pour accéder à SQLite.
+2. **Le contrôle visuel ne remplace pas la règle métier** : le formulaire
+   désactive l'action si le montant est trop élevé, et le service revalide le
+   solde au moment d'enregistrer.
+3. **Les erreurs sont traitées au bon niveau** : une erreur métier est montrée
+   avec son explication ; une erreur inattendue est journalisée et remplacée
+   par un message qui ne bloque pas l'application.
+4. **Les tests UI sont automatisables** : le mode `offscreen` permet de
+   construire et manipuler les widgets même sans écran graphique.

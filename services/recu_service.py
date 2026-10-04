@@ -36,6 +36,10 @@ class RecuService:
         """
         return self.repository.get_by_numero(numero)
 
+    def get_recu_by_id(self, recu_id: int) -> Optional[Recu]:
+        """Récupère un reçu par son identifiant interne."""
+        return self.repository.get_by_id(recu_id)
+
     def get_recu_by_paiement(self, paiement_id: int) -> Optional[Recu]:
         """
         Récupère le reçu associé à un paiement.
