@@ -235,7 +235,7 @@ class PaiementService:
         # Annuler le paiement
         self.paiement_repo.annuler(paiement_id, motif_annulation)
 
-    def get_paiements_eleve(self, eleve_id: int, annee_id: int) -> list:
+    def get_paiements_eleve(self, eleve_id: int, annee_id: int) -> List[Paiement]:
         """
         Récupère tous les paiements d'un élève pour une année.
 
@@ -247,6 +247,18 @@ class PaiementService:
             Liste des paiements.
         """
         return self.paiement_repo.get_by_eleve(eleve_id, annee_id)
+
+    def get_paiement_by_id(self, paiement_id: int) -> Optional[Paiement]:
+        """
+        Récupère un paiement par son ID.
+
+        Args:
+            paiement_id: ID du paiement.
+
+        Returns:
+            Le paiement trouvé ou None.
+        """
+        return self.paiement_repo.get_by_id(paiement_id)
 
     def _generer_numero_recu(self, annee_id: int) -> str:
         """
