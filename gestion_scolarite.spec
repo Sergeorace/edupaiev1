@@ -12,8 +12,9 @@ a = Analysis(
     binaries=[],
     datas=[
         ('school.db', '.'),
-        ('resources/styles/style.qss', 'resources/styles'),
+        ('resources/styles/edupaie_orange.qss', 'resources/styles'),
         ('resources/icons', 'resources/icons'),
+        ('resources/fonts', 'resources/fonts'),
     ],
     hiddenimports=[
         'PySide6.QtCore',

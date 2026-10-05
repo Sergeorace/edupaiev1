@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-def resource_path(relative_path: str) -> Path:
+def resource_path(relative_path: str) -> str:
     """
     Retourne le chemin absolu vers une ressource.
 
@@ -18,7 +18,7 @@ def resource_path(relative_path: str) -> Path:
         relative_path: Chemin relatif depuis la racine du projet.
 
     Returns:
-        Chemin absolu vers la ressource.
+        Chemin absolu vers la ressource (string).
     """
     try:
         # PyInstaller crée un dossier temporaire pour les ressources
@@ -27,7 +27,7 @@ def resource_path(relative_path: str) -> Path:
         # En développement, utiliser le répertoire du script
         base_path = Path(__file__).parent.parent
 
-    return base_path / relative_path
+    return str(base_path / relative_path)
 
 
 def get_user_data_dir() -> Path:
@@ -74,7 +74,8 @@ def copy_db_if_needed() -> None:
 
     if not user_db_path.exists():
         # Copier la base de données template
-        template_db_path = resource_path("school.db")
+        template_db_path_str = resource_path("school.db")
+        template_db_path = Path(template_db_path_str)
 
         if template_db_path.exists():
             import shutil

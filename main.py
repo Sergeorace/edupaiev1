@@ -11,10 +11,36 @@ from typing import Optional
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import QFile, QTextStream
+from PySide6.QtGui import QFontDatabase
 
 from database.database import create_connection
 from ui.main_window import MainWindow
-from utils.paths import get_user_db_path, copy_db_if_needed
+from utils.paths import get_user_db_path, copy_db_if_needed, resource_path
+
+
+def load_fonts() -> None:
+    """
+    Charge les polices personnalisées depuis le dossier resources/fonts.
+    """
+    fonts_dir = resource_path("resources/fonts")
+
+    if isinstance(fonts_dir, str):
+        fonts_path = Path(fonts_dir)
+    else:
+        fonts_path = fonts_dir
+
+    if fonts_path.exists():
+        # Charger Poppins
+        for weight in ["SemiBold", "Bold", "ExtraBold"]:
+            font_file = fonts_path / f"Poppins-{weight}.ttf"
+            if font_file.exists():
+                QFontDatabase.addApplicationFont(str(font_file))
+
+        # Charger Inter
+        for weight in ["Regular", "Medium", "SemiBold"]:
+            font_file = fonts_path / f"Inter-{weight}.ttf"
+            if font_file.exists():
+                QFontDatabase.addApplicationFont(str(font_file))
 
 
 def setup_logging() -> None:
@@ -69,9 +95,11 @@ def load_stylesheet(app: QApplication) -> None:
     Args:
         app: Instance QApplication.
     """
-    style_path = Path(__file__).parent / "resources" / "styles" / "style.qss"
+    style_path_str = resource_path("resources/styles/edupaie_orange.qss")
+    style_path = Path(style_path_str)
+
     if style_path.exists():
-        file = QFile(str(style_path))
+        file = QFile(style_path_str)
         if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
             stream = QTextStream(file)
             app.setStyleSheet(stream.readAll())
@@ -88,8 +116,11 @@ def main() -> int:
 
     # Créer l'application
     app = QApplication(sys.argv)
-    app.setApplicationName("Gestion Scolarité")
-    app.setOrganizationName("Ecole")
+    app.setApplicationName("Edupaie")
+    app.setOrganizationName("Edupaie")
+
+    # Charger les polices personnalisées
+    load_fonts()
 
     # Charger le style
     load_stylesheet(app)
