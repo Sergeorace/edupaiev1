@@ -50,7 +50,7 @@ class TestMainWindow:
         qtbot.addWidget(window)
         window.show()
 
-        assert window.windowTitle() == "Gestion Scolarité"
+        assert window.windowTitle() == "Edupaie"
         assert window.minimumWidth() == 1000
         assert window.minimumHeight() == 700
         assert window.stacked_widget.count() == 3
