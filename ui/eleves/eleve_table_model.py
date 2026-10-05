@@ -27,6 +27,7 @@ class EleveTableModel(QAbstractTableModel):
         self._statuts: dict[int, str] = {}
 
         self._headers = [
+            "ID",
             "Matricule",
             "Nom",
             "Prénom",
@@ -67,36 +68,40 @@ class EleveTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.DisplayRole:
             if column == 0:
-                return eleve.matricule
+                return str(eleve.id)
             if column == 1:
-                return eleve.nom
+                return eleve.matricule
             if column == 2:
-                return eleve.prenom
+                return eleve.nom
             if column == 3:
-                return eleve.classe_nom or f"Classe {eleve.classe_id}"
+                return eleve.prenom
             if column == 4:
-                return eleve.tuteur
+                return eleve.classe_nom or f"Classe {eleve.classe_id}"
             if column == 5:
-                return eleve.telephone
+                return eleve.tuteur
             if column == 6:
+                return eleve.telephone
+            if column == 7:
                 solde = self._soldes.get(eleve.id, 0)
                 return format_montant(solde)
-            if column == 7:
+            if column == 8:
                 return self._statuts.get(eleve.id, "Inconnu")
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            if column == 6:
+            if column == 0:
+                return int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            if column == 7:
                 return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         elif role == Qt.ItemDataRole.ForegroundRole:
-            if column in (6, 7):
+            if column in (7, 8):
                 statut = self._statuts.get(eleve.id, "")
                 if statut == "Impayé":
-                    return QColor("#e74c3c")
+                    return QColor("#DC2626")
                 if statut == "Partiel":
-                    return QColor("#f39c12")
+                    return QColor("#D97706")
                 if statut == "Payé":
-                    return QColor("#27ae60")
+                    return QColor("#16A34A")
 
         return None
 
@@ -150,8 +155,8 @@ class EleveTableModel(QAbstractTableModel):
         )
         if row is not None:
             self.dataChanged.emit(
-                self.index(row, 6),
                 self.index(row, 7),
+                self.index(row, 8),
                 [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole],
             )
 

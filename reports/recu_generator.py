@@ -6,13 +6,12 @@ Utilise reportlab pour créer des PDF à partir des données figées stockées d
 import json
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
@@ -22,16 +21,6 @@ ETABLISSEMENT_NOM = "ÉCOLE EXEMPLE"
 ETABLISSEMENT_ADRESSE = "123 Rue de l'École"
 ETABLISSEMENT_VILLE = "Abidjan, Côte d'Ivoire"
 ETABLISSEMENT_TEL = "+225 01 02 03 04 05"
-
-
-def register_fonts() -> None:
-    """
-    Enregistre les polices pour le PDF.
-    Utilise Helvetica (standard) pour éviter les dépendances externes.
-    """
-    # Helvetica est une police standard disponible dans reportlab
-    # Pas besoin d'enregistrer des polices personnalisées
-    pass
 
 
 def generer_pdf_recu(
@@ -61,7 +50,7 @@ def generer_pdf_recu(
     if output_path is None:
         output_path = Path.home() / "Desktop" / f"recu_{numero_recu}.pdf"
 
-    # Créer le document PDF
+    # Créer le document PDF avec métadonnées fixes pour la reproductibilité
     doc = SimpleDocTemplate(
         str(output_path),
         pagesize=A4,
@@ -69,6 +58,9 @@ def generer_pdf_recu(
         leftMargin=2 * cm,
         topMargin=2 * cm,
         bottomMargin=2 * cm,
+        title="Reçu de paiement",
+        author=ETABLISSEMENT_NOM,
+        subject=f"Reçu {numero_recu}",
     )
 
     # Créer les éléments du document
@@ -92,7 +84,7 @@ def generer_pdf_recu(
                 ("FONTNAME", (0, 0), (0, 2), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (0, 0), 18),
                 ("FONTSIZE", (0, 1), (0, 2), 10),
-                ("TEXTCOLOR", (0, 0), (0, 2), colors.darkblue),
+                ("TEXTCOLOR", (0, 0), (0, 2), colors.HexColor("#EA580C")),
             ]
         )
     )
@@ -108,8 +100,15 @@ def generer_pdf_recu(
     elements.append(Spacer(1, 0.5 * cm))
 
     # Numéro et date du reçu
+    # Formater la date de génération pour l'affichage
+    try:
+        date_obj = datetime.fromisoformat(date_generation)
+        date_affichage = date_obj.strftime("%d/%m/%Y %H:%M")
+    except:
+        date_affichage = date_generation
+
     info_recu_data = [
-        [f"Numéro : {numero_recu}", f"Date : {date_generation}"],
+        [f"Numéro : {numero_recu}", f"Date : {date_affichage}"],
     ]
 
     info_recu_table = Table(info_recu_data, colWidths=[7.5 * cm, 7.5 * cm])
@@ -127,16 +126,17 @@ def generer_pdf_recu(
 
     elements.append(Spacer(1, 1 * cm))
 
-    # Ligne de séparation
-    elements.append(Spacer(1, 0.2 * cm))
-
     # Informations de l'élève et du paiement
+    montant = donnees.get('montant', 0)
+    total_paye = donnees.get('total_paye', 0)
+    solde = donnees.get('solde', 0)
+
     paiement_data = [
         ["Élève :", donnees.get("nom", "")],
         ["Classe :", donnees.get("classe", "")],
-        ["Montant payé :", f"{donnees.get('montant', 0):,} FCFA".replace(",", " ")],
-        ["Total payé à ce jour :", f"{donnees.get('total_paye', 0):,} FCFA".replace(",", " ")],
-        ["Solde restant :", f"{donnees.get('solde', 0):,} FCFA".replace(",", " ")],
+        ["Montant payé :", f"{montant:,} FCFA".replace(",", " ")],
+        ["Total payé à ce jour :", f"{total_paye:,} FCFA".replace(",", " ")],
+        ["Solde restant :", f"{solde:,} FCFA".replace(",", " ")],
         ["Date du paiement :", donnees.get("date_paiement", "")],
     ]
 
@@ -158,12 +158,14 @@ def generer_pdf_recu(
 
     elements.append(Spacer(1, 1.5 * cm))
 
-    # Mode de paiement
-    mode_paiement = donnees.get("mode_paiement", "Non spécifié")
-    mode_text = Paragraph(f"<b>Mode de paiement :</b> {mode_paiement}", styles["Normal"])
-    elements.append(mode_text)
-
-    elements.append(Spacer(1, 2 * cm))
+    # Mode de paiement (si disponible)
+    mode_paiement = donnees.get("mode_paiement")
+    if mode_paiement:
+        mode_text = Paragraph(f"<b>Mode de paiement :</b> {mode_paiement}", styles["Normal"])
+        elements.append(mode_text)
+        elements.append(Spacer(1, 2 * cm))
+    else:
+        elements.append(Spacer(1, 2 * cm))
 
     # Pied de page
     pied_data = [
@@ -188,10 +190,6 @@ def generer_pdf_recu(
 
     # Ajouter le filigrane "ANNULÉ" si le paiement est annulé
     if statut_paiement == "annulé":
-        watermark = Paragraph(
-            "<font size=40 color=red><b>ANNULÉ</b></font>", styles["Normal"]
-        )
-        # Le filigrane sera ajouté lors de la construction du canvas
         doc.build(elements, onFirstPage=lambda canvas, doc: _add_watermark(canvas, "ANNULÉ"))
     else:
         doc.build(elements)
