@@ -1,0 +1,383 @@
+/* Thème Orange Edupaie */
+
+/* Police principale */
+* {
+    font-family: "Inter", "Segoe UI", sans-serif;
+    font-size: 14px;
+}
+
+/* QMainWindow */
+QMainWindow {
+    background-color: #FFF9F5;
+}
+
+/* Sidebar */
+QFrame#Sidebar {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FB923C, stop:1 #EA580C);
+}
+
+/* Logo sidebar */
+QLabel#Logo {
+    font-family: "Poppins", "Segoe UI", sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: #ffffff;
+    padding: 16px;
+}
+
+/* Boutons de navigation */
+QPushButton#NavButton {
+    background-color: transparent;
+    border: none;
+    color: #FFEDD5;
+    padding: 14px 16px;
+    text-align: left;
+    font-family: "Poppins", "Segoe UI", sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    border-radius: 8px;
+    margin: 2px 8px;
+}
+
+QPushButton#NavButton:hover {
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+QPushButton#NavButton:checked {
+    background-color: #ffffff;
+    color: #C2410C;
+    font-weight: 700;
+}
+
+/* Titre de page */
+QLabel#PageTitle {
+    font-family: "Poppins", "Segoe UI", sans-serif;
+    font-size: 30px;
+    font-weight: 800;
+    color: #7C2D12;
+}
+
+/* Cartes du dashboard */
+QFrame#Card {
+    background-color: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #FED7AA;
+}
+
+QLabel#CardValue {
+    font-family: "Poppins", "Segoe UI", sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: #7C2D12;
+}
+
+QLabel#CardLabel {
+    font-size: 13px;
+    color: #9A3412;
+    font-weight: 500;
+}
+
+/* Tableaux */
+QTableView {
+    background-color: #ffffff;
+    border: 1px solid #FED7AA;
+    border-radius: 8px;
+    gridline-color: #FFEDD5;
+    font-size: 14px;
+}
+
+QTableWidget {
+    background-color: #ffffff;
+    alternate-background-color: #FFF7ED;
+    border: 1px solid #FED7AA;
+    border-radius: 8px;
+    gridline-color: #FFEDD5;
+    font-size: 14px;
+}
+
+QTableView::item {
+    padding: 8px 10px;
+    color: #7C2D12;
+}
+
+QTableWidget::item {
+    padding: 8px 10px;
+    color: #7C2D12;
+}
+
+QTableView::item:selected {
+    background-color: #FFEDD5;
+    color: #7C2D12;
+    font-weight: 600;
+}
+
+QTableWidget::item:selected {
+    background-color: #FFEDD5;
+    color: #7C2D12;
+    font-weight: 600;
+}
+
+QTableView::item:hover {
+    background-color: #FFF1E3;
+}
+
+QTableWidget::item:hover {
+    background-color: #FFF1E3;
+}
+
+QHeaderView::section {
+    background-color: #FFF7ED;
+    color: #9A3412;
+    padding: 14px 10px;
+    border: none;
+    border-bottom: 2px solid #FB923C;
+    font-family: "Poppins", "Segoe UI", sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Boutons principaux */
+QPushButton {
+    background-color: #FB923C;
+    color: white;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-family: "Poppins", "Segoe UI", sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #F97316;
+}
+
+QPushButton:pressed {
+    background-color: #EA580C;
+}
+
+QPushButton:disabled {
+    background-color: #F3E8DD;
+    color: #B8A99A;
+}
+
+/* Bouton Ajouter */
+QPushButton#BtnAjouter {
+    background-color: #16A34A;
+}
+
+QPushButton#BtnAjouter:hover {
+    background-color: #15803D;
+}
+
+/* Bouton Modifier */
+QPushButton#BtnModifier {
+    background-color: #F97316;
+}
+
+QPushButton#BtnModifier:hover {
+    background-color: #EA580C;
+}
+
+/* Bouton Fiche */
+QPushButton#BtnFiche {
+    background-color: #FB923C;
+}
+
+QPushButton#BtnFiche:hover {
+    background-color: #F97316;
+}
+
+/* Bouton Payer */
+QPushButton#BtnPayer {
+    background-color: #EA580C;
+}
+
+QPushButton#BtnPayer:hover {
+    background-color: #C2410C;
+}
+
+/* Bouton Archiver */
+QPushButton#BtnArchiver {
+    background-color: #DC2626;
+}
+
+QPushButton#BtnArchiver:hover {
+    background-color: #B91C1C;
+}
+
+/* Bouton danger générique */
+QPushButton#dangerButton {
+    background-color: #DC2626;
+}
+
+QPushButton#dangerButton:hover {
+    background-color: #B91C1C;
+}
+
+/* Bouton success générique */
+QPushButton#successButton {
+    background-color: #16A34A;
+}
+
+QPushButton#successButton:hover {
+    background-color: #15803D;
+}
+
+/* Champs de formulaire */
+QLineEdit, QComboBox, QDateEdit, QSpinBox {
+    padding: 10px 12px;
+    border: 1px solid #FED7AA;
+    border-radius: 8px;
+    background-color: white;
+    font-size: 14px;
+    color: #7C2D12;
+}
+
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QSpinBox:focus {
+    border: 2px solid #F97316;
+}
+
+/* Labels */
+QLabel {
+    color: #7C2D12;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Labels requis */
+QLabel#required {
+    color: #DC2626;
+}
+
+/* Message de validation */
+QLabel#validationMessage {
+    color: #DC2626;
+    font-weight: 600;
+}
+
+/* Labels de solde */
+QLabel#balanceBefore, QLabel#balanceAfter {
+    padding: 12px;
+    background-color: #ffffff;
+    border: 1px solid #FED7AA;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #7C2D12;
+}
+
+/* Labels de la fiche élève */
+QLabel#StudentInfo {
+    font-size: 16px;
+    font-weight: 600;
+    color: #7C2D12;
+}
+
+QLabel#FinanceLabel {
+    font-size: 14px;
+    color: #7C2D12;
+}
+
+QLabel#BalanceLabel {
+    font-size: 14px;
+    font-weight: 600;
+    color: #7C2D12;
+}
+
+QLabel#StatusLabel {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QLabel#Subtitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: #7C2D12;
+}
+
+/* Dialog */
+QDialog {
+    background-color: #ffffff;
+}
+
+/* Statut colors */
+QLabel#statutImpaye {
+    color: #DC2626;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+QLabel#statutPartiel {
+    color: #D97706;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+QLabel#statutPaye {
+    color: #16A34A;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+/* ScrollArea */
+QScrollArea {
+    border: none;
+    background-color: #FFF9F5;
+}
+
+/* Barre de recherche */
+QLineEdit#searchInput {
+    background-color: #ffffff;
+    border: 1px solid #FED7AA;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+QLineEdit#searchInput:focus {
+    border: 2px solid #F97316;
+}
+
+/* Scrollbar fine */
+QScrollBar:vertical {
+    border: none;
+    background: #FFF7ED;
+    width: 8px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: #FDBA74;
+    min-height: 20px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #F97316;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    border: none;
+    background: #FFF7ED;
+    height: 8px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #FDBA74;
+    min-width: 20px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #F97316;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
