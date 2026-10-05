@@ -72,7 +72,7 @@ class EleveDetailDialog(QDialog):
 
         # Informations de l'élève
         self.info_label = QLabel()
-        self.info_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.info_label.setObjectName("StudentInfo")
         layout.addWidget(self.info_label)
 
         # Statistiques financières
@@ -80,26 +80,26 @@ class EleveDetailDialog(QDialog):
         stats_layout.setSpacing(20)
 
         self.lbl_frais_dus = QLabel()
-        self.lbl_frais_dus.setStyleSheet("font-size: 14px;")
+        self.lbl_frais_dus.setObjectName("FinanceLabel")
         stats_layout.addWidget(self.lbl_frais_dus)
 
         self.lbl_total_paye = QLabel()
-        self.lbl_total_paye.setStyleSheet("font-size: 14px;")
+        self.lbl_total_paye.setObjectName("FinanceLabel")
         stats_layout.addWidget(self.lbl_total_paye)
 
         self.lbl_solde = QLabel()
-        self.lbl_solde.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.lbl_solde.setObjectName("BalanceLabel")
         stats_layout.addWidget(self.lbl_solde)
 
         self.lbl_statut = QLabel()
-        self.lbl_statut.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.lbl_statut.setObjectName("StatusLabel")
         stats_layout.addWidget(self.lbl_statut)
 
         layout.addLayout(stats_layout)
 
         # Historique des paiements
         subtitle = QLabel("Historique des paiements")
-        subtitle.setStyleSheet("font-size: 16px; font-weight: bold;")
+        subtitle.setObjectName("Subtitle")
         layout.addWidget(subtitle)
 
         self.table_paiements = QTableWidget()
@@ -169,15 +169,13 @@ class EleveDetailDialog(QDialog):
         self.lbl_total_paye.setText(f"Total payé : {format_montant(total_paye)}")
         self.lbl_solde.setText(f"Solde : {format_montant(solde)}")
         self.lbl_statut.setText(f"Statut : {statut}")
-        status_colors = {
-            "Impayé": "#e74c3c",
-            "Partiel": "#d97706",
-            "Payé": "#16804a",
-        }
-        self.lbl_statut.setStyleSheet(
-            f"font-size: 14px; font-weight: bold; "
-            f"color: {status_colors.get(statut, '#2c3e50')};"
-        )
+        # Les couleurs de statut sont gérées par QSS via objectName
+        if statut == "Impayé":
+            self.lbl_statut.setObjectName("statutImpaye")
+        elif statut == "Partiel":
+            self.lbl_statut.setObjectName("statutPartiel")
+        elif statut == "Payé":
+            self.lbl_statut.setObjectName("statutPaye")
         self._update_paiements_table(paiements, recus)
 
     def _get_data(

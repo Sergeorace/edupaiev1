@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QTableView,
     QVBoxLayout,
     QWidget,
+    QHeaderView,
 )
 
 from services.eleve_service import EleveService
@@ -44,17 +45,17 @@ class ElevesWidget(QWidget):
     def _setup_ui(self) -> None:
         """Construit les contrôles de recherche, le tableau et les actions."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 24, 28, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(32, 28, 32, 28)
+        layout.setSpacing(20)
 
         title = QLabel("Gestion des élèves")
-        title.setObjectName("title")
+        title.setObjectName("PageTitle")
         layout.addWidget(title)
 
         filters_layout = QHBoxLayout()
-        filters_layout.setSpacing(10)
+        filters_layout.setSpacing(12)
         self.search_input = QLineEdit()
-        self.search_input.setObjectName("studentSearch")
+        self.search_input.setObjectName("searchInput")
         self.search_input.setClearButtonEnabled(True)
         self.search_input.setPlaceholderText(
             "Rechercher par nom, prénom ou matricule"
@@ -90,29 +91,45 @@ class ElevesWidget(QWidget):
             self._on_selection_changed
         )
         self.table_view.doubleClicked.connect(self._on_fiche)
+
+        # Ajuster la largeur des colonnes
+        header = self.table_view.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # ID
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Matricule
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Nom
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Prénom
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Classe
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Tuteur
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Téléphone
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Solde
+        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)  # Statut
+
         layout.addWidget(self.table_view, stretch=1)
 
         buttons_layout = QHBoxLayout()
-        buttons_layout.setSpacing(8)
-        self.btn_ajouter = QPushButton("Ajouter")
-        self.btn_ajouter.setObjectName("successButton")
+        buttons_layout.setSpacing(10)
+        self.btn_ajouter = QPushButton("➕ Ajouter")
+        self.btn_ajouter.setObjectName("BtnAjouter")
         self.btn_ajouter.clicked.connect(self._on_ajouter)
         buttons_layout.addWidget(self.btn_ajouter)
 
-        self.btn_modifier = QPushButton("Modifier")
+        self.btn_modifier = QPushButton("✏️ Modifier")
+        self.btn_modifier.setObjectName("BtnModifier")
         self.btn_modifier.clicked.connect(self._on_modifier)
         buttons_layout.addWidget(self.btn_modifier)
 
-        self.btn_fiche = QPushButton("Fiche")
+        self.btn_fiche = QPushButton("📄 Fiche")
+        self.btn_fiche.setObjectName("BtnFiche")
         self.btn_fiche.clicked.connect(self._on_fiche)
         buttons_layout.addWidget(self.btn_fiche)
 
-        self.btn_payer = QPushButton("Payer")
+        self.btn_payer = QPushButton("💰 Payer")
+        self.btn_payer.setObjectName("BtnPayer")
         self.btn_payer.clicked.connect(self._on_payer)
         buttons_layout.addWidget(self.btn_payer)
 
-        self.btn_archiver = QPushButton("Archiver")
-        self.btn_archiver.setObjectName("dangerButton")
+        self.btn_archiver = QPushButton("🗑️ Archiver")
+        self.btn_archiver.setObjectName("BtnArchiver")
         self.btn_archiver.clicked.connect(self._on_archiver)
         buttons_layout.addWidget(self.btn_archiver)
         buttons_layout.addStretch()
@@ -225,14 +242,17 @@ class ElevesWidget(QWidget):
     def _on_selection_changed(self, *_args: Any) -> None:
         """Met à jour les actions disponibles selon la sélection."""
         selected = self.table_view.selectionModel().selectedRows()
-        self._set_action_buttons_enabled(bool(selected))
+        has_selection = bool(selected) and len(selected) > 0
+        self._set_action_buttons_enabled(has_selection)
 
     def _selected_eleve(self) -> Optional[Eleve]:
         """Retourne l'élève sélectionné dans la table."""
         selected = self.table_view.selectionModel().selectedRows()
         if not selected:
             return None
-        return self.table_model.get_eleve_at(selected[0].row())
+        row = selected[0].row()
+        eleve = self.table_model.get_eleve_at(row)
+        return eleve
 
     def _on_ajouter(self) -> None:
         """Ouvre le formulaire de création d'un élève."""

@@ -51,87 +51,72 @@ class EleveFormDialog(QDialog):
 
         if eleve:
             self._load_eleve_data()
+        else:
+            # Générer automatiquement le matricule pour un nouvel élève
+            self._generate_matricule()
 
     def _setup_ui(self) -> None:
         """Configure l'interface utilisateur."""
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
         # Matricule
-        matricule_layout = QHBoxLayout()
-        matricule_label = QLabel("Matricule *")
-        matricule_label.setObjectName("required")
+        matricule_label = QLabel("Matricule")
         self.matricule_input = QLineEdit()
-        matricule_layout.addWidget(matricule_label)
-        matricule_layout.addWidget(self.matricule_input)
-        layout.addLayout(matricule_layout)
+        self.matricule_input.setPlaceholderText("Ex: MAT001")
+        layout.addWidget(matricule_label)
+        layout.addWidget(self.matricule_input)
 
         # Nom
-        nom_layout = QHBoxLayout()
-        nom_label = QLabel("Nom *")
-        nom_label.setObjectName("required")
+        nom_label = QLabel("Nom")
         self.nom_input = QLineEdit()
-        nom_layout.addWidget(nom_label)
-        nom_layout.addWidget(self.nom_input)
-        layout.addLayout(nom_layout)
+        self.nom_input.setPlaceholderText("Nom de l'élève")
+        layout.addWidget(nom_label)
+        layout.addWidget(self.nom_input)
 
         # Prénom
-        prenom_layout = QHBoxLayout()
-        prenom_label = QLabel("Prénom *")
-        prenom_label.setObjectName("required")
+        prenom_label = QLabel("Prénom")
         self.prenom_input = QLineEdit()
-        prenom_layout.addWidget(prenom_label)
-        prenom_layout.addWidget(self.prenom_input)
-        layout.addLayout(prenom_layout)
+        self.prenom_input.setPlaceholderText("Prénom de l'élève")
+        layout.addWidget(prenom_label)
+        layout.addWidget(self.prenom_input)
 
         # Date de naissance
-        naissance_layout = QHBoxLayout()
-        naissance_label = QLabel("Date de naissance *")
-        naissance_label.setObjectName("required")
+        naissance_label = QLabel("Date de naissance")
         self.naissance_input = QDateEdit()
         self.naissance_input.setCalendarPopup(True)
         self.naissance_input.setDate(QDate.currentDate())
         self.naissance_input.setMaximumDate(QDate.currentDate())
-        naissance_layout.addWidget(naissance_label)
-        naissance_layout.addWidget(self.naissance_input)
-        layout.addLayout(naissance_layout)
+        layout.addWidget(naissance_label)
+        layout.addWidget(self.naissance_input)
 
         # Sexe
-        sexe_layout = QHBoxLayout()
-        sexe_label = QLabel("Sexe *")
-        sexe_label.setObjectName("required")
+        sexe_label = QLabel("Sexe")
         self.sexe_input = QComboBox()
         self.sexe_input.addItems(["M", "F"])
-        sexe_layout.addWidget(sexe_label)
-        sexe_layout.addWidget(self.sexe_input)
-        layout.addLayout(sexe_layout)
+        layout.addWidget(sexe_label)
+        layout.addWidget(self.sexe_input)
 
         # Classe
-        classe_layout = QHBoxLayout()
-        classe_label = QLabel("Classe *")
-        classe_label.setObjectName("required")
+        classe_label = QLabel("Classe")
         self.classe_input = QComboBox()
-        classe_layout.addWidget(classe_label)
-        classe_layout.addWidget(self.classe_input)
-        layout.addLayout(classe_layout)
+        layout.addWidget(classe_label)
+        layout.addWidget(self.classe_input)
 
         # Tuteur
-        tuteur_layout = QHBoxLayout()
-        tuteur_label = QLabel("Tuteur *")
-        tuteur_label.setObjectName("required")
+        tuteur_label = QLabel("Tuteur")
         self.tuteur_input = QLineEdit()
-        tuteur_layout.addWidget(tuteur_label)
-        tuteur_layout.addWidget(self.tuteur_input)
-        layout.addLayout(tuteur_layout)
+        self.tuteur_input.setPlaceholderText("Nom du tuteur")
+        layout.addWidget(tuteur_label)
+        layout.addWidget(self.tuteur_input)
 
         # Téléphone
-        telephone_layout = QHBoxLayout()
-        telephone_label = QLabel("Téléphone *")
-        telephone_label.setObjectName("required")
+        telephone_label = QLabel("Téléphone")
         self.telephone_input = QLineEdit()
-        telephone_layout.addWidget(telephone_label)
-        telephone_layout.addWidget(self.telephone_input)
-        layout.addLayout(telephone_layout)
+        self.telephone_input.setPlaceholderText("Numéro de téléphone")
+        layout.addWidget(telephone_label)
+        layout.addWidget(self.telephone_input)
 
         layout.addStretch()
 
@@ -144,7 +129,7 @@ class EleveFormDialog(QDialog):
         buttons_layout.addWidget(self.btn_annuler)
 
         self.btn_enregistrer = QPushButton("Enregistrer")
-        self.btn_enregistrer.setObjectName("successButton")
+        self.btn_enregistrer.setObjectName("BtnAjouter")
         self.btn_enregistrer.clicked.connect(self._on_enregistrer)
         buttons_layout.addWidget(self.btn_enregistrer)
 
@@ -163,10 +148,31 @@ class EleveFormDialog(QDialog):
         for classe_id, classe_nom in self.classes.items():
             self.classe_input.addItem(classe_nom, classe_id)
 
+    def _generate_matricule(self) -> None:
+        """Génère automatiquement un matricule pour un nouvel élève."""
+        try:
+            # Récupérer tous les élèves pour trouver le dernier matricule
+            eleves = self.service.list_eleves(actif_only=False)
+            if eleves:
+                # Extraire le numéro du dernier matricule et l'incrémenter
+                last_matricule = max(e.matricule for e in eleves)
+                # Format: MAT001, MAT002, etc.
+                last_num = int(last_matricule.replace("MAT", ""))
+                new_num = last_num + 1
+                new_matricule = f"MAT{new_num:03d}"
+            else:
+                new_matricule = "MAT001"
+            self.matricule_input.setText(new_matricule)
+            self.matricule_input.setReadOnly(True)  # Rendre le champ en lecture seule
+        except Exception:
+            # En cas d'erreur, laisser le champ vide
+            self.matricule_input.setReadOnly(False)
+
     def _load_eleve_data(self) -> None:
         """Charge les données de l'élève dans le formulaire."""
         if self.eleve:
             self.matricule_input.setText(self.eleve.matricule)
+            self.matricule_input.setReadOnly(False)  # Modifiable lors de la modification
             self.nom_input.setText(self.eleve.nom)
             self.prenom_input.setText(self.eleve.prenom)
             self.naissance_input.setDate(

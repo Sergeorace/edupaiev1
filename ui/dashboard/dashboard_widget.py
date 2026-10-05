@@ -16,8 +16,7 @@ from PySide6.QtWidgets import (
 
 from services.dashboard_service import DashboardService
 from ui.error_handling import run_service_operation
-from utils.date_utils import parse_date
-from utils.formatters import format_date, format_montant
+from utils.formatters import format_montant
 
 
 class DashboardWidget(QWidget):
@@ -34,16 +33,16 @@ class DashboardWidget(QWidget):
     def _setup_ui(self) -> None:
         """Construit les indicateurs et le tableau des paiements récents."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 24, 28, 28)
-        layout.setSpacing(22)
+        layout.setContentsMargins(32, 28, 32, 28)
+        layout.setSpacing(24)
 
         title = QLabel("Tableau de bord")
-        title.setObjectName("title")
+        title.setObjectName("PageTitle")
         layout.addWidget(title)
 
         cards_layout = QGridLayout()
-        cards_layout.setHorizontalSpacing(14)
-        cards_layout.setVerticalSpacing(14)
+        cards_layout.setHorizontalSpacing(16)
+        cards_layout.setVerticalSpacing(16)
         self.card_encaisse = self._create_card("Total encaissé", "0 FCFA")
         self.card_restant = self._create_card("Total restant dû", "0 FCFA")
         self.card_impayes = self._create_card("Élèves impayés", "0")
@@ -87,14 +86,14 @@ class DashboardWidget(QWidget):
     def _create_card(self, label: str, value: str) -> QFrame:
         """Construit une carte pour un indicateur."""
         card = QFrame()
-        card.setObjectName("card")
+        card.setObjectName("Card")
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(18, 16, 18, 16)
         value_label = QLabel(value)
-        value_label.setObjectName("cardValue")
+        value_label.setObjectName("CardValue")
         card_layout.addWidget(value_label)
         label_widget = QLabel(label)
-        label_widget.setObjectName("cardLabel")
+        label_widget.setObjectName("CardLabel")
         card_layout.addWidget(label_widget)
         card.value_label = value_label
         return card
@@ -132,7 +131,7 @@ class DashboardWidget(QWidget):
                 f"{paiement['eleve_nom']} {paiement['eleve_prenom']}",
                 paiement.get("classe_nom") or "—",
                 format_montant(paiement["montant"]),
-                format_date(parse_date(paiement["date_paiement"])),
+                paiement["date_paiement"],
                 paiement["mode_paiement"],
                 "Annulé" if paiement["statut"] == "annule" else "Valide",
             )

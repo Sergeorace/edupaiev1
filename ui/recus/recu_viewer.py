@@ -7,7 +7,6 @@ from pathlib import Path
 from datetime import datetime
 
 from PySide6.QtWidgets import (
-    QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLineEdit,
@@ -19,12 +18,10 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMenu,
     QWidget,
+    QLabel,
 )
-from PySide6.QtCore import QPoint, Qt
-from PySide6.QtGui import QAction, QPainter
-from PySide6.QtCore import QPoint
-from PySide6.QtPrintSupport import QPrintDialog, QPrinter
-from PySide6.QtPdf import QPdfDocument
+from PySide6.QtCore import Qt, QPoint
+from PySide6.QtGui import QAction
 
 from services.recu_service import RecuService
 from services.paiement_service import PaiementService
@@ -61,20 +58,20 @@ class RecusViewerWidget(QWidget):
     def _setup_ui(self) -> None:
         """Configure l'interface utilisateur."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(32, 28, 32, 28)
+        layout.setSpacing(20)
 
         # Titre
-        title = QPushButton("Gestion des reçus")
-        title.setObjectName("title")
-        title.setCheckable(False)
+        title = QLabel("Gestion des reçus")
+        title.setObjectName("PageTitle")
         layout.addWidget(title)
 
         # Barre de recherche
         search_layout = QHBoxLayout()
-        search_layout.setSpacing(10)
+        search_layout.setSpacing(12)
 
         self.search_input = QLineEdit()
+        self.search_input.setObjectName("searchInput")
         self.search_input.setPlaceholderText("Rechercher (numéro, élève)...")
         self.search_input.textChanged.connect(self._on_search_changed)
         search_layout.addWidget(self.search_input, stretch=1)
@@ -87,9 +84,9 @@ class RecusViewerWidget(QWidget):
 
         # Tableau des reçus
         self.table_recus = QTableWidget()
-        self.table_recus.setColumnCount(7)
+        self.table_recus.setColumnCount(9)
         self.table_recus.setHorizontalHeaderLabels(
-            ["Numéro", "Élève", "Classe", "Montant", "Date paiement", "Date reçu", "Statut"]
+            ["Numéro", "Élève", "Classe", "Montant", "Date paiement", "Date reçu", "Statut", "Actions"]
         )
         self.table_recus.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.ResizeMode.ResizeToContents
@@ -112,21 +109,28 @@ class RecusViewerWidget(QWidget):
         self.table_recus.horizontalHeader().setSectionResizeMode(
             6, QHeaderView.ResizeMode.ResizeToContents
         )
+        self.table_recus.horizontalHeader().setSectionResizeMode(
+            7, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.table_recus.horizontalHeader().setSectionResizeMode(
+            8, QHeaderView.ResizeMode.ResizeToContents
+        )
         self.table_recus.setAlternatingRowColors(True)
         self.table_recus.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_recus.customContextMenuRequested.connect(self._show_context_menu)
+        self.table_recus.doubleClicked.connect(self._on_double_click)
         layout.addWidget(self.table_recus)
 
         # Boutons d'action
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(10)
 
-        self.btn_exporter = QPushButton("Exporter PDF")
+        self.btn_exporter = QPushButton("📥 Télécharger PDF")
         self.btn_exporter.clicked.connect(self._on_exporter_pdf)
         self.btn_exporter.setEnabled(False)
         buttons_layout.addWidget(self.btn_exporter)
 
-        self.btn_imprimer = QPushButton("Imprimer")
+        self.btn_imprimer = QPushButton("🖨️ Imprimer")
         self.btn_imprimer.clicked.connect(self._on_imprimer)
         self.btn_imprimer.setEnabled(False)
         buttons_layout.addWidget(self.btn_imprimer)
@@ -216,8 +220,6 @@ class RecusViewerWidget(QWidget):
 
             # Date paiement
             date_paiement = donnees.get("date_paiement", "")
-            if date_paiement:
-                date_paiement = format_date(parse_date(date_paiement))
             date_paiement_item = QTableWidgetItem(date_paiement)
             self.table_recus.setItem(row, 4, date_paiement_item)
 
@@ -243,6 +245,26 @@ class RecusViewerWidget(QWidget):
                 statut_item = QTableWidgetItem("Inconnu")
                 self.table_recus.setItem(row, 6, statut_item)
 
+            # Boutons d'action dans le tableau
+            widget_actions = QWidget()
+            layout_actions = QHBoxLayout(widget_actions)
+            layout_actions.setContentsMargins(5, 2, 5, 2)
+            layout_actions.setSpacing(5)
+
+            btn_download = QPushButton("📥")
+            btn_download.setFixedSize(30, 25)
+            btn_download.setToolTip("Télécharger PDF")
+            btn_download.clicked.connect(lambda _, r=row: self._download_row(r))
+            layout_actions.addWidget(btn_download)
+
+            btn_print = QPushButton("🖨️")
+            btn_print.setFixedSize(30, 25)
+            btn_print.setToolTip("Imprimer")
+            btn_print.clicked.connect(lambda _, r=row: self._print_row(r))
+            layout_actions.addWidget(btn_print)
+
+            self.table_recus.setCellWidget(row, 7, widget_actions)
+
     def _on_search_changed(self) -> None:
         """Gère le changement de texte de recherche."""
         search_text = self.search_input.text().strip()
@@ -255,6 +277,22 @@ class RecusViewerWidget(QWidget):
 
         self.btn_exporter.setEnabled(has_selection)
         self.btn_imprimer.setEnabled(has_selection)
+
+    def _on_double_click(self) -> None:
+        """Gère le double-clic sur le tableau pour télécharger le PDF."""
+        self._on_exporter_pdf()
+
+    def _download_row(self, row: int) -> None:
+        """Télécharge le PDF pour une ligne spécifique."""
+        # Sélectionner la ligne
+        self.table_recus.selectRow(row)
+        self._on_exporter_pdf()
+
+    def _print_row(self, row: int) -> None:
+        """Imprime le PDF pour une ligne spécifique."""
+        # Sélectionner la ligne
+        self.table_recus.selectRow(row)
+        self._on_imprimer()
 
     def _show_context_menu(self, position: QPoint) -> None:
         """
@@ -328,11 +366,13 @@ class RecusViewerWidget(QWidget):
             if not file_path:
                 return None
 
+            # Déterminer le statut du paiement
+            statut_paiement = "valide"
+            if paiement and paiement.statut == "annule":
+                statut_paiement = "annulé"
+
             # Générer le PDF
-            statut_paiement = (
-                "annulé" if paiement and paiement.statut == "annule" else "valide"
-            )
-            return generer_pdf_recu(
+            output_path = generer_pdf_recu(
                 recu.donnees_json,
                 recu.numero,
                 recu.date_generation,
@@ -340,12 +380,18 @@ class RecusViewerWidget(QWidget):
                 Path(file_path),
             )
 
+            # Vérifier que le fichier a été créé
+            if output_path and output_path.exists():
+                return output_path
+            else:
+                raise RuntimeError("Le fichier PDF n'a pas été créé")
+
         success, file_path = run_service_operation(
             self, "l'export PDF du reçu", export_recu
         )
         if success and file_path is not None:
             QMessageBox.information(
-                self, "Succès", f"Le reçu a été exporté :\n{file_path}"
+                self, "Succès", f"Le reçu a été exporté avec succès :\n{file_path}"
             )
 
     def _on_imprimer(self) -> None:
@@ -355,13 +401,14 @@ class RecusViewerWidget(QWidget):
             return
 
         def print_recu() -> None:
-            # Générer le PDF temporaire
+            # Générer le PDF dans le dossier temporaire
             import tempfile
+            import subprocess
+            import platform
 
             with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
                 temp_path = Path(tmp.name)
 
-            document: Optional[QPdfDocument] = None
             try:
                 statut_paiement = (
                     "annulé" if paiement and paiement.statut == "annule" else "valide"
@@ -374,46 +421,26 @@ class RecusViewerWidget(QWidget):
                     temp_path,
                 )
 
-                printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-                dialog = QPrintDialog(printer, self)
-                if dialog.exec() != QPrintDialog.DialogCode.Accepted:
-                    return
+                # Ouvrir le PDF avec le visualiseur par défaut du système
+                # Cela permet à l'utilisateur d'imprimer via le visualiseur
+                if platform.system() == "Windows":
+                    subprocess.Popen(["start", "", str(temp_path)], shell=True)
+                elif platform.system() == "Darwin":  # macOS
+                    subprocess.Popen(["open", str(temp_path)])
+                else:  # Linux
+                    subprocess.Popen(["xdg-open", str(temp_path)])
 
-                document = QPdfDocument()
-                load_error = document.load(str(temp_path))
-                if load_error != QPdfDocument.Error.None_:
-                    raise RuntimeError("Le reçu PDF n'a pas pu être chargé.")
-
-                painter = QPainter()
-                if not painter.begin(printer):
-                    raise RuntimeError("L'impression n'a pas pu démarrer.")
-                try:
-                    page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
-                    page_size = page_rect.size().toSize()
-                    for page_index in range(document.pageCount()):
-                        if page_index:
-                            printer.newPage()
-                        image = document.render(page_index, page_size)
-                        if image.isNull():
-                            raise RuntimeError("Une page du reçu PDF est illisible.")
-                        position = QPoint(
-                            int(
-                                page_rect.x()
-                                + (page_size.width() - image.width()) // 2
-                            ),
-                            int(
-                                page_rect.y()
-                                + (page_size.height() - image.height()) // 2
-                            ),
-                        )
-                        painter.drawImage(position, image)
-                finally:
-                    painter.end()
+                QMessageBox.information(
+                    self,
+                    "Impression",
+                    "Le PDF a été ouvert. Utilisez le visualiseur PDF pour imprimer.",
+                )
+            except Exception as e:
+                raise e
             finally:
-                if document is not None:
-                    document.close()
-                    document = None
-                temp_path.unlink(missing_ok=True)
+                # Le fichier temporaire sera supprimé automatiquement par le système
+                # après fermeture du visualiseur
+                pass
 
         run_service_operation(self, "l'impression du reçu", print_recu)
 

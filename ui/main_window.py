@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QStackedWidget,
     QLabel,
-    QStyle,
 )
 from typing import Any
 
@@ -32,7 +31,7 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         self.conn = conn
-        self.setWindowTitle("Gestion Scolarité")
+        self.setWindowTitle("Edupaie")
         self.setMinimumSize(1000, 700)
 
         # Créer le widget central
@@ -85,7 +84,7 @@ class MainWindow(QMainWindow):
             Frame contenant la barre latérale.
         """
         sidebar = QFrame()
-        sidebar.setObjectName("sidebar")
+        sidebar.setObjectName("Sidebar")
         sidebar.setFixedWidth(200)
 
         layout = QVBoxLayout(sidebar)
@@ -93,8 +92,8 @@ class MainWindow(QMainWindow):
         layout.setSpacing(5)
 
         # Titre
-        title = QLabel("Gestion Scolarité")
-        title.setObjectName("sidebarTitle")
+        title = QLabel("Edupaie")
+        title.setObjectName("Logo")
         title.setWordWrap(True)
         layout.addWidget(title)
 
@@ -103,24 +102,21 @@ class MainWindow(QMainWindow):
         # Boutons de navigation
         self.sidebar_buttons = []
 
-        btn_dashboard = QPushButton("Tableau de bord")
-        btn_dashboard.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+        btn_dashboard = QPushButton("▣ Tableau de bord")
         btn_dashboard.setCheckable(True)
-        btn_dashboard.setObjectName("navButton")
+        btn_dashboard.setObjectName("NavButton")
         self.sidebar_buttons.append(btn_dashboard)
         layout.addWidget(btn_dashboard)
 
-        btn_eleves = QPushButton("Élèves")
-        btn_eleves.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogListView))
+        btn_eleves = QPushButton("👤 Élèves")
         btn_eleves.setCheckable(True)
-        btn_eleves.setObjectName("navButton")
+        btn_eleves.setObjectName("NavButton")
         self.sidebar_buttons.append(btn_eleves)
         layout.addWidget(btn_eleves)
 
-        btn_recus = QPushButton("Reçus")
-        btn_recus.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+        btn_recus = QPushButton("▸ Reçus")
         btn_recus.setCheckable(True)
-        btn_recus.setObjectName("navButton")
+        btn_recus.setObjectName("NavButton")
         self.sidebar_buttons.append(btn_recus)
         layout.addWidget(btn_recus)
 
