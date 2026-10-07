@@ -85,6 +85,7 @@ class PaiementDialog(QDialog):
         self.mode_input = QComboBox()
         self.mode_input.setObjectName("paymentMode")
         self.mode_input.addItems(["Espèces", "Chèque", "Virement", "Mobile"])
+        self.mode_input.setEditable(False)
         self.mode_input.currentTextChanged.connect(self._validate_form)
         mode_layout.addWidget(self.mode_input, stretch=1)
         layout.addLayout(mode_layout)

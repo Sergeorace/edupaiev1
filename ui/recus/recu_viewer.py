@@ -5,6 +5,7 @@ Widget de visualisation et gestion des reçus.
 from typing import Any, Optional
 from pathlib import Path
 from datetime import datetime
+from functools import partial
 
 from PySide6.QtWidgets import (
     QVBoxLayout,
@@ -84,7 +85,7 @@ class RecusViewerWidget(QWidget):
 
         # Tableau des reçus
         self.table_recus = QTableWidget()
-        self.table_recus.setColumnCount(9)
+        self.table_recus.setColumnCount(8)
         self.table_recus.setHorizontalHeaderLabels(
             ["Numéro", "Élève", "Classe", "Montant", "Date paiement", "Date reçu", "Statut", "Actions"]
         )
@@ -112,14 +113,13 @@ class RecusViewerWidget(QWidget):
         self.table_recus.horizontalHeader().setSectionResizeMode(
             7, QHeaderView.ResizeMode.ResizeToContents
         )
-        self.table_recus.horizontalHeader().setSectionResizeMode(
-            8, QHeaderView.ResizeMode.ResizeToContents
-        )
         self.table_recus.setAlternatingRowColors(True)
         self.table_recus.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_recus.customContextMenuRequested.connect(self._show_context_menu)
         self.table_recus.doubleClicked.connect(self._on_double_click)
-        layout.addWidget(self.table_recus)
+        self.table_recus.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table_recus.setMinimumHeight(400)
+        layout.addWidget(self.table_recus, stretch=1)
 
         # Boutons d'action
         buttons_layout = QHBoxLayout()
@@ -248,19 +248,21 @@ class RecusViewerWidget(QWidget):
             # Boutons d'action dans le tableau
             widget_actions = QWidget()
             layout_actions = QHBoxLayout(widget_actions)
-            layout_actions.setContentsMargins(5, 2, 5, 2)
-            layout_actions.setSpacing(5)
+            layout_actions.setContentsMargins(4, 2, 4, 2)
+            layout_actions.setSpacing(4)
 
-            btn_download = QPushButton("📥")
-            btn_download.setFixedSize(30, 25)
+            btn_download = QPushButton("↓")
+            btn_download.setFixedSize(24, 24)
             btn_download.setToolTip("Télécharger PDF")
-            btn_download.clicked.connect(lambda _, r=row: self._download_row(r))
+            btn_download.setObjectName("btnDownload")
+            btn_download.clicked.connect(partial(self._download_row, row))
             layout_actions.addWidget(btn_download)
 
-            btn_print = QPushButton("🖨️")
-            btn_print.setFixedSize(30, 25)
+            btn_print = QPushButton("🖨")
+            btn_print.setFixedSize(24, 24)
             btn_print.setToolTip("Imprimer")
-            btn_print.clicked.connect(lambda _, r=row: self._print_row(r))
+            btn_print.setObjectName("btnPrint")
+            btn_print.clicked.connect(partial(self._print_row, row))
             layout_actions.addWidget(btn_print)
 
             self.table_recus.setCellWidget(row, 7, widget_actions)

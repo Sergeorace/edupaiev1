@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QLabel,
     QLineEdit,
     QComboBox,
@@ -44,7 +45,9 @@ class EleveFormDialog(QDialog):
         self.annee_id = 1
 
         self.setWindowTitle("Ajouter un élève" if eleve is None else "Modifier l'élève")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(450)
+        self.setMaximumWidth(450)
+        self.setMaximumHeight(550)
 
         self._setup_ui()
         self._load_classes()
@@ -58,67 +61,73 @@ class EleveFormDialog(QDialog):
     def _setup_ui(self) -> None:
         """Configure l'interface utilisateur."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+
+        # Grille pour les champs
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(10)
+        grid_layout.setVerticalSpacing(8)
 
         # Matricule
         matricule_label = QLabel("Matricule")
         self.matricule_input = QLineEdit()
         self.matricule_input.setPlaceholderText("Ex: MAT001")
-        layout.addWidget(matricule_label)
-        layout.addWidget(self.matricule_input)
+        grid_layout.addWidget(matricule_label, 0, 0)
+        grid_layout.addWidget(self.matricule_input, 0, 1)
 
         # Nom
         nom_label = QLabel("Nom")
         self.nom_input = QLineEdit()
         self.nom_input.setPlaceholderText("Nom de l'élève")
-        layout.addWidget(nom_label)
-        layout.addWidget(self.nom_input)
+        grid_layout.addWidget(nom_label, 1, 0)
+        grid_layout.addWidget(self.nom_input, 1, 1)
 
         # Prénom
         prenom_label = QLabel("Prénom")
         self.prenom_input = QLineEdit()
         self.prenom_input.setPlaceholderText("Prénom de l'élève")
-        layout.addWidget(prenom_label)
-        layout.addWidget(self.prenom_input)
+        grid_layout.addWidget(prenom_label, 2, 0)
+        grid_layout.addWidget(self.prenom_input, 2, 1)
 
         # Date de naissance
         naissance_label = QLabel("Date de naissance")
         self.naissance_input = QDateEdit()
         self.naissance_input.setCalendarPopup(True)
+        self.naissance_input.setDisplayFormat("dd/MM/yyyy")
         self.naissance_input.setDate(QDate.currentDate())
         self.naissance_input.setMaximumDate(QDate.currentDate())
-        layout.addWidget(naissance_label)
-        layout.addWidget(self.naissance_input)
+        grid_layout.addWidget(naissance_label, 3, 0)
+        grid_layout.addWidget(self.naissance_input, 3, 1)
 
         # Sexe
         sexe_label = QLabel("Sexe")
         self.sexe_input = QComboBox()
         self.sexe_input.addItems(["M", "F"])
-        layout.addWidget(sexe_label)
-        layout.addWidget(self.sexe_input)
+        grid_layout.addWidget(sexe_label, 4, 0)
+        grid_layout.addWidget(self.sexe_input, 4, 1)
 
         # Classe
         classe_label = QLabel("Classe")
         self.classe_input = QComboBox()
-        layout.addWidget(classe_label)
-        layout.addWidget(self.classe_input)
+        grid_layout.addWidget(classe_label, 5, 0)
+        grid_layout.addWidget(self.classe_input, 5, 1)
 
         # Tuteur
         tuteur_label = QLabel("Tuteur")
         self.tuteur_input = QLineEdit()
         self.tuteur_input.setPlaceholderText("Nom du tuteur")
-        layout.addWidget(tuteur_label)
-        layout.addWidget(self.tuteur_input)
+        grid_layout.addWidget(tuteur_label, 6, 0)
+        grid_layout.addWidget(self.tuteur_input, 6, 1)
 
         # Téléphone
         telephone_label = QLabel("Téléphone")
         self.telephone_input = QLineEdit()
         self.telephone_input.setPlaceholderText("Numéro de téléphone")
-        layout.addWidget(telephone_label)
-        layout.addWidget(self.telephone_input)
+        grid_layout.addWidget(telephone_label, 7, 0)
+        grid_layout.addWidget(self.telephone_input, 7, 1)
 
-        layout.addStretch()
+        layout.addLayout(grid_layout)
 
         # Boutons
         buttons_layout = QHBoxLayout()
