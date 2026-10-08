@@ -35,3 +35,10 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# AI tools
+.claude/
+.cursor/
+.codeium/
+.copilot/
+.github/copilot/
